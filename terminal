@@ -1,0 +1,41 @@
+name: deploy-pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 공개 저장소라서, 비밀값이 섞여 들어오면 배포 자체를 멈춘다.
+      - name: 비밀값 검사
+        run: |
+          bad=0
+          if ls *.gs 2>/dev/null | grep -q .; then echo "::error::Code.gs 같은 .gs 파일은 이 저장소에 올리면 안 됩니다"; bad=1; fi
+          if grep -RInE "AKfyc[A-Za-z0-9_-]{20,}" --include=*.html --include=*.js --include=*.json . ; then
+            echo "::error::Apps Script 배포 URL이 파일 안에 들어 있습니다 (SETUP 화면으로 입력해야 함)"; bad=1; fi
+          if grep -RInE "WRITE_KEY:[[:space:]]*\"[^\"]+\"" --include=*.html . ; then
+            echo "::error::WRITE_KEY 값이 파일 안에 들어 있습니다"; bad=1; fi
+          exit $bad
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
