@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- === [V38] PWA === 
+     file:// 로 열면 이 세 줄은 조용히 무시된다 (manifest·SW 모두 https 필요).
+     GitHub Pages 등 https에 올렸을 때만 '홈 화면에 추가'가 활성화된다.
+     로컬 파일 사용은 지금과 똑같이 계속 된다. -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#090b0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TKSTOCK">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="robots" content="noindex,nofollow">
+<!-- === [V43] 매매일지 전용 글꼴: 나눔고딕코딩 (영문 1칸 · 한글·기호 2칸 고정폭) ===
+     일지 원문의 표는 '한글 = 영문 2칸'으로 공백을 넣어 맞춰져 있다. 이 비율이 정확히 1:2인 글꼴로
+     그려야 작성할 때와 같은 칸에 선다. 못 받으면(오프라인) 기존 고정폭 글꼴로 대신 그린다. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap">
+<title>TKSTOCK TERMINAL</title>
+<style>
+  :root{
+    --bg:#000000; --panel:#0b0b0d; --panel2:#111114; --line:#26261c;
+    --amber:#ffb000; --amber-dim:#b37c00; --white:#e9e9e4; --muted:#7d7d68;
+    --up:#33d17a; --dn:#ff5b5b; --cyan:#4fd4ff; --violet:#c08cff; --warn:#ffd23f;
+    --hdr-fg:#000000;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);}
+  body{
+    font-family:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,"Liberation Mono",monospace;
+    color:var(--white); font-size:12px; line-height:1.35;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  #app{display:flex; flex-direction:column; height:100vh;}
+  a,.k{color:var(--cyan); cursor:pointer; text-decoration:none;}
+  .k:hover{background:var(--cyan); color:#000;}
+  .amber{color:var(--amber);} .muted{color:var(--muted);} .up{color:var(--up);} .dn{color:var(--dn);}
+  .cyan{color:var(--cyan);} .warn{color:var(--warn);} .violet{color:var(--violet);}
+  .b{font-weight:700;}
+
+  /* top bar */
+  #topbar{display:flex; align-items:center; gap:14px; padding:5px 10px;
+    background:linear-gradient(#151510,#0a0a08); border-bottom:1px solid var(--line);}
+  #brand{font-weight:800; letter-spacing:2px; color:var(--amber);}
+  #brand .go{background:var(--amber); color:#000; padding:0 5px; margin-left:6px; border-radius:1px;}
+  #topbar .stat{white-space:nowrap;}
+  #topbar .spacer{flex:1;}
+  #reglight{padding:1px 8px; border:1px solid var(--line); border-radius:2px; font-weight:700;}
+  #clock{color:var(--muted);}
+  #conn{font-weight:700;}
+
+  /* command bar */
+  #cmdbar{display:flex; align-items:center; gap:8px; padding:4px 10px;
+    background:#0a0a08; border-bottom:1px solid var(--line);}
+  #prompt{color:var(--amber); font-weight:700;}
+  #cmd{flex:0 0 auto; width:230px; background:#000; border:1px solid var(--amber-dim);
+    color:var(--amber); font:inherit; padding:2px 6px; outline:none; text-transform:uppercase;}
+  #cmd:focus{border-color:var(--amber); box-shadow:0 0 0 1px var(--amber-dim) inset;}
+  #cmdhint{color:var(--muted); overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+  #cmdhint b{color:var(--amber-dim);}
+
+  /* ticker tape */
+  #tape{overflow:hidden; white-space:nowrap; border-bottom:1px solid var(--line);
+    background:#050504; padding:3px 0; position:relative;}
+  #tapeInner{display:inline-block; padding-left:100%; animation:tape 55s linear infinite;}
+  #tape:hover #tapeInner{animation-play-state:paused;}
+  @keyframes tape{from{transform:translateX(0)} to{transform:translateX(-50%)}}
+  .tq{margin:0 18px;} .tq .sym{color:var(--amber);} .tq .px{color:var(--white);}
+
+  /* screen */
+  #screen{flex:1; overflow:auto; padding:8px; }
+  #screen::-webkit-scrollbar{width:9px;height:9px;} #screen::-webkit-scrollbar-thumb{background:#2a2a1c;}
+  .viewhdr{display:flex; align-items:baseline; gap:10px; margin-bottom:6px;}
+  .viewhdr .code{background:var(--amber); color:#000; font-weight:800; padding:1px 7px;}
+  .viewhdr .ttl{color:var(--amber); font-weight:700; letter-spacing:1px;}
+  .viewhdr .sub{color:var(--muted);}
+
+  .panel{border:1px solid var(--line); background:var(--panel); margin-bottom:8px;}
+  .panel>.ph{background:var(--amber); color:#000; font-weight:700; padding:2px 8px; letter-spacing:.5px;
+    display:flex; justify-content:space-between; align-items:center;}
+  .panel>.ph .rt{font-weight:600; color:#3a2b00;}
+  .panel>.pb{padding:6px 8px;}
+  .grid{display:grid; gap:8px;}
+  .g2{grid-template-columns:1fr 1fr;} .g3{grid-template-columns:1fr 1fr 1fr;}
+  @media(max-width:900px){.g2,.g3{grid-template-columns:1fr;}}
+
+  table{border-collapse:collapse; width:100%;}
+  th,td{padding:1px 8px 1px 0; text-align:right; white-space:nowrap;}
+  th{color:var(--amber-dim); font-weight:600; border-bottom:1px solid var(--line); text-align:right;}
+  th:first-child,td:first-child{text-align:left; padding-left:2px;}
+  tr.row:hover td{background:#17170f;}
+  td.sym{color:var(--cyan); cursor:pointer;} td.sym:hover{background:var(--cyan); color:#000;}
+  .bar{display:inline-block; height:8px; vertical-align:middle;}
+  .tag{padding:0 5px; border:1px solid currentColor; border-radius:2px; font-size:10px; font-weight:700;}
+  .chip{padding:0 5px; border-radius:2px; font-weight:700;}
+  .chip.on{background:var(--up); color:#000;} .chip.off{background:var(--dn); color:#000;}
+  .chip.neu{background:#333; color:var(--white);}
+
+  /* launchpad tiles */
+  .tiles{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:8px;}
+  @media(max-width:1100px){.tiles{grid-template-columns:repeat(2,1fr);}}
+  .tile{border:1px solid var(--line); background:var(--panel); padding:8px; cursor:pointer; position:relative;}
+  .tile:hover{border-color:var(--amber); background:var(--panel2);}
+  .tile .num{position:absolute; top:6px; right:8px; color:var(--amber-dim); font-weight:800;}
+  .tile .code{color:var(--amber); font-weight:800; letter-spacing:1px;}
+  .tile .nm{color:var(--white); margin-top:2px;} .tile .ko{color:var(--muted); font-size:11px;}
+
+  .banner{border:1px solid var(--amber-dim); background:#1a1204; color:var(--warn);
+    padding:4px 8px; margin-bottom:8px; font-size:11px;}
+  .foot{padding:3px 10px; border-top:1px solid var(--line); background:#0a0a08; color:var(--muted);
+    display:flex; gap:14px; flex-wrap:wrap;}
+  .foot .k{padding:0 4px;}
+  .sep{height:1px;background:var(--line);margin:6px 0;}
+  .kpi{font-size:20px; font-weight:800;}
+  .mono-sm{font-size:11px;}
+  svg text{font-family:inherit;}
+  .legend span{margin-right:12px;}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:3px;}
+  /* === [V24] 뉴스 팝업 모달 === */
+  #modalbg{position:fixed;inset:0;background:rgba(0,0,0,.74);display:none;z-index:60;align-items:flex-start;justify-content:center;padding:6vh 12px}
+  #modal{width:min(760px,100%);max-height:82vh;overflow:auto;background:#0d1117;border:1px solid var(--amber);padding:14px 16px;box-shadow:0 0 30px rgba(0,0,0,.6)}
+  #modal .mraw{white-space:pre-wrap;word-break:break-word;background:#161b22;border:1px solid var(--bd);padding:8px;margin-top:6px;font-size:12px;line-height:1.5}
+  [data-news]{cursor:pointer}
+  /* === [V40] 섹터 로테이션 보드 === */
+  .rrghead{padding:6px 8px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;line-height:1.5}
+  .qs{display:inline-flex;gap:1px;vertical-align:middle}
+  .qs i{display:inline-block;width:14px;height:15px;font-style:normal;font-size:9.5px;line-height:15px;text-align:center;color:#000;font-weight:800;font-family:system-ui,sans-serif}
+  .qs i.na{background:#1a1a14}
+  tr.hl td{background:#1b1706}
+  .rrgcards{display:none;grid-template-columns:1fr;gap:6px}
+  .rcard{border:1px solid var(--line);background:var(--panel2);padding:7px 8px;display:flex;flex-direction:column;gap:5px}
+  .rcard .rtop{display:flex;justify-content:space-between;align-items:center}
+  .rcard .rq{color:#000;font-weight:800;padding:0 6px;border-radius:2px;font-family:system-ui,sans-serif;font-size:11px}
+  .rcard .rnum{display:flex;flex-wrap:wrap;gap:4px 12px}
+  .rcard .rv{font-family:system-ui,sans-serif;line-height:1.45}
+  @media(max-width:700px){.rrgtable{display:none}.rrgcards{display:grid}}
+  /* === [V41] 폰 폭: 상단 상태줄이 화면 밖으로 밀려(레이아웃 폭 ~640px) 페이지가 옆으로 스크롤되던 것 → 줄바꿈 === */
+  @media(max-width:700px){#topbar{flex-wrap:wrap;gap:4px 10px}#topbar .spacer{display:none}#clock{font-size:11px}#modal{box-sizing:border-box}}
+  /* === [V43] 매매일지 서식 보존 ===
+     줄 하나 = .jl 한 줄. 줄 앞 공백은 padding(ch)으로, 줄 안 공백은 pre-wrap으로 그대로 둔다.
+     □ ㅇ - ① ※ 머리기호는 매달린 들여쓰기 → 화면이 좁아 접혀도 본문이 기호 뒤에 맞춰 선다. */
+  :root{--jff:"Nanum Gothic Coding","NanumGothicCoding","D2Coding","GulimChe","굴림체","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;}
+  /* 글자 크기는 짝수 px만 쓴다: 영문 반칸(0.5em)이 정수 px여야 브라우저 반올림으로 한글 2칸과 어긋나지 않는다 */
+  textarea.jin{font-family:var(--jff);font-size:12px;line-height:1.6;tab-size:4;font-kerning:none;font-variant-ligatures:none;}
+  .jdoc{font-family:var(--jff);font-size:var(--jfs,12px);line-height:1.6;color:var(--white);font-kerning:none;font-variant-ligatures:none;}
+  .jdoc .jl{white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;}
+  .jdoc .jb{height:calc(var(--jfs,12px) * .8);}
+  .jdoc .jh1{color:var(--amber);font-weight:700;}
+  .jdoc .jh2 .jm{color:var(--amber-dim);font-weight:700;}
+  .jdoc .jh3 .jm{color:var(--muted);}
+  .jdoc .jnum .jm{color:var(--warn);font-weight:700;}
+  .jdoc .jnote{color:var(--muted);}
+  .jdoc .jlab{font-weight:700;color:#fff;}
+  .jdoc .jh1 .jlab{color:inherit;}
+  .jdoc .jref{color:var(--cyan);}
+  .jdoc .jlink{color:var(--cyan);cursor:pointer;border-bottom:1px dotted var(--cyan);}
+  /* 표: 줄바꿈 없이 가로 스크롤. 오른쪽(왼쪽)에 더 있으면 가장자리가 은은하게 빛난다(스크롤 그림자) */
+  .jdoc .jtbl{--tb:#0e0e0a;overflow-x:auto;margin:1px 0;border-left:2px solid #2a2a1c;
+    background:linear-gradient(to right,var(--tb) 30%,transparent) left/28px 100% no-repeat local,
+      linear-gradient(to left,var(--tb) 30%,transparent) right/28px 100% no-repeat local,
+      linear-gradient(to right,rgba(255,176,0,.30),transparent) left/12px 100% no-repeat scroll,
+      linear-gradient(to left,rgba(255,176,0,.30),transparent) right/12px 100% no-repeat scroll,
+      var(--tb);}
+  .jdoc .jtbl>div{width:max-content;min-width:100%;}
+  .jdoc .jtbl .jl{display:block;white-space:pre;}
+  .jfal .jdoc .jnum .jm,.jfalc .jdoc .jnum .jm{color:var(--dn);}
+  .jsec-h{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--amber-dim);margin:2px 0 3px;}
+  .jsec-h.dn{color:var(--dn);}
+  .jclamp{max-height:calc(var(--jl,12) * var(--jfs,12px) * 1.6);overflow:hidden;position:relative;}
+  .jclamp.over::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3.2em;pointer-events:none;
+    background:linear-gradient(rgba(11,11,13,0),var(--panel));}
+  .jmore{display:inline-block;margin-top:2px;font-size:11px;}
+  .jclamp:not(.over)+.jmore{display:none;}
+  .ph.jhd,.jhd2{cursor:pointer;}
+  .ph.jhd{gap:10px;align-items:flex-start;}
+  .ph.jhd .jhl{min-width:0;word-break:keep-all;}
+  .ph.jhd .rt{white-space:nowrap;}
+  .ph.jhd .k{color:#000;text-decoration:underline;}
+  .jbar{display:flex;gap:10px;align-items:center;margin-bottom:4px;}
+  .jent{padding:6px 0;border-bottom:1px dashed var(--line);}
+  .jent:first-child{padding-top:0;} .jent:last-child{border-bottom:0;padding-bottom:0;}
+  .jhd2{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;margin-bottom:3px;}
+  .jhd2:hover .b{color:var(--cyan);}
+  tr.jrow{cursor:pointer;} tr.jrow:hover td.jttl{color:var(--cyan);}
+  td.jttl{white-space:normal;min-width:120px;}
+  /* 읽기 창 (일지 1건 전체) */
+  #modalbg.jm{padding:3vh 10px;}
+  #modal.jm{width:min(1100px,100%);max-height:92vh;padding:0 18px 18px;--jfs:14px;}
+  #modal.jm .jmh{position:sticky;top:0;z-index:2;background:#0d1117;padding:12px 0 6px;box-shadow:0 1px 0 var(--line);
+    display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  #modal.jm .jmt{color:var(--amber);font-weight:700;font-size:15px;line-height:1.4;word-break:keep-all;min-width:0;}
+  #modal.jm .jmeta{color:var(--muted);font-size:11px;margin-top:8px;display:flex;flex-wrap:wrap;gap:3px 12px;}
+  #modal.jm .jact{margin-top:6px;padding-bottom:8px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:11px;}
+  #modal.jm .jact .jcur{background:var(--cyan);color:#000;}
+  #modal.jm .jsec{margin-top:12px;}
+  #modal.jm .jfal{border-left:2px solid var(--dn);padding-left:12px;margin-top:16px;}
+  #modal.jm .jdoc .jtbl{--tb:#11151b;}
+  @media(max-width:700px){
+    #modalbg.jm{padding:1.5vh 4px;}
+    #modal.jm{max-height:97vh;padding:0 10px 14px;--jfs:12px;}
+    #modal.jm .jfal{padding-left:8px;}
+    td.jprev,th.jprev{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="modalbg"><div id="modal"></div></div>
+<div id="app">
+  <div id="topbar">
+    <span id="brand">TKSTOCK<span class="go">&lt;GO&gt;</span></span>
+    <span class="stat muted">VIX <span id="tbvix" class="warn b"></span></span>
+    <span class="stat muted">BREADTH <span id="tbbr" class="b"></span></span>
+    <span id="reglight">REGIME</span>
+    <span class="stat muted">P/L <span id="tbpl" class="b"></span></span>
+    <span id="tbviol"></span>
+    <span class="spacer"></span>
+    <span id="conn" class="warn">◆ SIM FEED</span>
+    <span id="clock"></span>
+  </div>
+
+  <div id="cmdbar">
+    <span id="prompt">CMD▸</span>
+    <input id="cmd" autocomplete="off" spellcheck="false" placeholder="함수코드 또는 티커…">
+    <span id="cmdhint"></span>
+  </div>
+
+  <div id="tape"><span id="tapeInner"></span></div>
+
+  <div id="screen"></div>
+
+  <div class="foot" id="fkeys"></div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   TKSTOCK TERMINAL  —  10개 고도화 방안 통합 콕핏
+   1 NEWS  종목별 뉴스 사이드카        6 REGIME 시장 레짐·브레드스
+   2 CAT   촉매 캘린더                 7 RRG    섹터 로테이션
+   3 MAP   공급망·테마 파급 맵          8 REV    컨센서스 EPS 리비전
+   4 RISK  ATR 손절·규칙 엔진          9 VAL    밸류에이션 Z-스코어
+   5 PORT  포지션·손익 블로터          10 SIG   신호 백테스트·애널리스트 원장
+
+   [DATA] 단면(현재가/RS/U/D/EPS/PER/PEG/목표가/보유단가/섹터ETF/VIX)은
+   실제 시트(2026-07-19)에서 읽은 값. 시계열(ATR·MA·PER히스토리·EPS리비전·
+   백테스트)은 현재값에 앵커링한 시드(seed) 데이터로 로직을 실제 구동한다.
+   → LIVE 연결: [V41] 파일에 URL·키를 넣지 않는다. 첫 실행 때 SETUP 화면에서 입력 → 이 브라우저에만 저장.
+   ========================================================================== */
+
+/* === [V40] RRG → 섹터 로테이션 보드 ===
+   ① 히스토리를 '주당 1점'으로 정리한다 (weeklyHist). Database는 주말에 토·일 두 행을 써서
+      rsHist의 26개 날짜가 실제로는 13주였고, "5칸 전" 비교는 2주 변화였다.
+      같은 이유로 epsHist의 마지막 두 점이 토·일이면 EPS WoW가 0 → REV 브레드스가 '보합'으로 쏠렸다.
+      Code.gs V40이 주 1점으로 보내지만, 구버전 GAS여도 여기서 한 번 더 정리한다.
+   ② RS 시계열의 마지막 점 = 대시보드 현재 RS. 주중에도 머리가 움직이고,
+      표의 RS와 그림의 점이 같은 값이 된다 (V39까지는 점 X=대시보드, 꼬리=Database로 어긋났다).
+   ③ 사분면 = RS × 4주 변화 (RS>0 & Δ≥0 주도 / RS>0 & Δ<0 약화 / RS≤0 & Δ≥0 개선 / RS≤0 & Δ<0 소외).
+      U/D는 칸을 나누지 않고 숫자로만 보여준다. 커넥터 sector_rotation도 같은 기준.
+   ④ 화면: 한 줄 결론 → 보드(13주 흐름·RS 추이·판정) → 보조 RRG. 폭 700px 이하에서는 카드.
+   ⑤ 전이는 2주 연속 같은 칸일 때 '확정'으로 본다 (주간 흔들림 필터). */
+
+const CONFIG = {
+  LIVE_URL: "",              // === [V41] 비워 둔다. SETUP에서 입력한 값이 localStorage에서 채워진다 (아래 SECRETS)
+  WRITE_KEY: "",             // === [V41] 비워 둔다. 일지 저장용 키 — Code.gs의 WRITE_KEY와 같은 값을 SETUP에서 입력
+  ATR_N: 2.5,                // 시트 헤더 n
+  VIX: 18.77,
+  ASOF: "2026-07-19",
+
+  /* === [V33] TradingView 차트 임베드 ===
+     자체 캔들 렌더러 대신 TradingView 위젯(무료·브랜딩 표시 조건)을 iframe으로 붙인다.
+     ⚠️ 이건 '그림'이라 터미널 룰 엔진이 읽지 못한다 — MA20·DD-10 판정은
+        Python이 계산한 숫자로 별도 실측화한다(차트와 규칙은 다른 물건). */
+  /* === [V35] 자동 갱신 주기(분) — 0이면 끔 ===
+     지금까지 tryLive()는 페이지 로드 시 1회만 돌았다. 화면을 켜둔 채로 있으면
+     켠 시점의 데이터를 계속 보게 된다 (뉴스가 안 들어오는 것처럼 보이던 원인). */
+  REFRESH_MIN: 5,
+  TV_ENABLE: true,
+  TV_HEIGHT: "min(58vh, 460px)",
+  // 자동 인식이 틀리는 종목만 여기서 거래소를 고정 (예: "NBIS":"NASDAQ:NBIS")
+  TV_MAP: { "S&P 500": "SP:SPX", "^GSPC": "SP:SPX" },
+};
+
+/* === [V41] 비밀값 분리 ===
+   V40까지는 LIVE_URL(시트 전체를 읽는 웹앱 주소)과 WRITE_KEY가 이 파일 안에 있었다.
+   공개 저장소(GitHub Pages)에 올리면 누구나 포트폴리오를 읽고 일지를 쓸 수 있게 된다.
+   → 파일에는 빈 값만 두고, 첫 실행 때 SETUP 화면에서 받아 '이 기기의 이 브라우저'에만 저장한다.
+     다른 기기(PC·폰)는 각각 한 번씩 입력. 명령창에 SETUP(또는 하단 ⚙)으로 언제든 수정·삭제. */
+const SECRET_KEYS={url:"tkstock.liveUrl",key:"tkstock.writeKey"};
+function secretGet(k){try{return localStorage.getItem(k)||"";}catch(e){return "";}}
+function secretSet(k,v){try{if(v)localStorage.setItem(k,v);else localStorage.removeItem(k);return true;}catch(e){return false;}}
+CONFIG.LIVE_URL=secretGet(SECRET_KEYS.url);
+CONFIG.WRITE_KEY=secretGet(SECRET_KEYS.key);
+let LAST_LIVE_ERR="";
+
+/* ---- 단면 데이터 (실측, Main 탭 2026-07-19) -------------------------------
+   [tkr, sec, px, rs, ud, tgt, gap%, e26,e27,e28, p26,p27,p28, g27,g28, peg27,peg28] */
+let RAW = [
+ ["NBIS","Comm Svcs",177.71,-10.17,1.00,244.21,37.42,-2.22,-1.29,-0.70,null,null,null,41.89,45.74,null,null],
+ ["GEV","Industrials",1057.84,-6.67,0.92,1221.48,15.47,15.48,24.61,34.81,68.34,42.98,30.39,58.98,41.45,0.73,0.73],
+ ["PWR","Industrials",628.53,-21.20,0.51,759.51,20.84,14.00,16.42,19.79,44.90,38.28,31.76,17.29,20.52,2.21,1.55],
+ ["LITE","Technology",732.82,-23.65,0.88,1104.89,50.77,13.05,23.02,36.06,56.15,31.83,20.32,76.40,56.65,0.42,0.36],
+ ["MRVL","Technology",188.68,8.37,1.61,253.69,34.45,5.98,8.73,8.96,31.55,21.61,21.06,45.99,2.63,0.47,8.01],
+ ["PLTR","Technology",132.38,-2.31,1.12,183.12,38.33,1.47,2.09,3.01,90.05,63.34,43.98,42.18,44.02,1.50,1.00],
+ ["NVDA","Technology",202.81,-3.56,0.84,302.31,49.06,12.45,15.28,15.51,16.29,13.27,13.08,22.73,1.51,0.58,8.66],
+ ["GOOGL","Comm Svcs",346.77,-14.09,0.58,433.51,25.01,14.21,14.66,17.30,24.40,23.65,20.04,3.17,18.01,7.46,1.11],
+ ["MSFT","Technology",393.82,-5.92,1.12,558.21,41.74,18.09,21.09,24.52,21.77,18.67,16.06,16.58,16.26,1.13,0.99],
+ ["AAOI","Technology",102.41,-43.90,0.64,151.30,47.74,0.89,4.77,null,115.07,21.47,null,435.96,null,0.05,null],
+ ["QCOM","Technology",171.78,-11.72,1.18,222.73,29.66,10.85,11.63,14.47,15.83,14.77,11.87,7.19,24.42,2.05,0.49],
+ ["AVGO","Technology",370.83,-13.96,0.78,524.51,41.44,12.83,20.29,26.41,28.90,18.28,14.04,58.14,30.16,0.31,0.47],
+ ["NVTS","Technology",11.46,-32.55,0.98,14.46,26.20,-0.17,-0.14,-0.11,null,null,null,17.65,21.43,null,null],
+ ["ORCL","Technology",126.41,-35.88,0.53,251.85,99.23,9.78,13.66,15.55,12.93,9.25,8.13,39.67,13.84,0.23,0.59],
+ ["APP","Comm Svcs",424.54,-10.70,0.84,654.60,54.19,16.01,21.45,27.40,26.52,19.79,15.49,33.98,27.74,0.58,0.56],
+ ["RKLB","Industrials",67.62,-21.37,0.94,114.33,69.08,-0.26,-0.04,0.28,null,null,241.50,84.62,800.00,null,0.30],
+ ["TEM","Healthcare",52.47,-3.18,1.14,67.06,27.81,-0.35,-0.03,0.63,null,null,83.29,91.43,2200.00,null,0.04],
+];
+
+/* 보유 — [V41] 공개 배포용 가상 데모값 (실제 평균단가·수량 아님).
+   LIVE 연결 시 Holdings 탭 실데이터로 통째로 교체된다. */
+let HOLD = {
+  NVDA:{avg:180.00, qty:10},
+  MSFT:{avg:400.00, qty:5},
+  GEV:{avg:1000.00, qty:2},
+};
+
+/* 섹터 ETF (Main) [tkr, px, rs, ud, name, cyc/def] */
+let SECT = [
+ ["XLK",175.59,2.14,0.92,"Technology","cyc"],
+ ["XLF",56.26,7.65,1.39,"Financials","cyc"],
+ ["XLV",161.09,10.02,1.20,"Health Care","def"],
+ ["XLY",115.44,-4.76,1.05,"Cons Disc","cyc"],
+ ["XLC",110.65,-6.72,1.07,"Comm Svcs","cyc"],
+ ["XLI",179.41,0.43,0.91,"Industrials","cyc"],
+ ["XLP",85.19,0.57,0.90,"Cons Staples","def"],
+ ["XLE",57.68,0.67,1.01,"Energy","cyc"],
+ ["XLU",45.17,-1.81,1.33,"Utilities","def"],
+ ["XLRE",45.42,1.15,1.21,"Real Estate","def"],
+ ["XLB",50.53,-4.48,0.95,"Materials","cyc"],
+];
+
+/* 테마 & 공급망 링크 (방안 3) */
+const THEMES = {
+ "AI Compute":["NVDA","AVGO","MRVL","GOOGL","MSFT","NBIS"],
+ "Optical/DCI":["LITE","AAOI","MRVL","AVGO"],
+ "Power/Electrification":["GEV","PWR","NVTS"],
+ "Edge/Physical AI":["QCOM","NVTS"],
+ "AI Software":["PLTR","APP","TEM","ORCL","MSFT","GOOGL"],
+ "Neocloud":["NBIS","ORCL"],
+ "Space":["RKLB"],
+};
+const LINKS = [
+ ["NVDA","AVGO","compute↔interconnect"],["NVDA","MRVL","custom silicon"],["NVDA","NBIS","GPU→neocloud"],
+ ["NVDA","ORCL","GPU↔cloud capex"],["NVDA","GOOGL","GPU↔TPU capex"],
+ ["AVGO","MRVL","networking peers"],["AVGO","LITE","optical/interconnect"],["MRVL","LITE","DCI"],
+ ["LITE","AAOI","optical peers"],
+ ["GEV","PWR","gen↔grid build"],["GEV","NVTS","electrification↔power semi"],["QCOM","NVTS","edge power"],
+ ["NBIS","ORCL","neocloud peers"],["MSFT","GOOGL","hyperscaler"],["MSFT","ORCL","cloud"],["PLTR","APP","AI software"],
+];
+
+/* 뉴스 (telegram_report_index 실측 5건 + 커버리지 시연용 [SIM] 표본)
+   sim:true 는 실제 브로커콜이 아닌 표본. dir: 강세/약세/중립. tc:목표가변동 */
+let NEWS = [
+ {d:"2026-07-03",src:"웰스파고",typ:"헤드라인",tk:["NVDA","AVGO","MRVL","QCOM"],dir:"중립",tc:"",
+  th:"NVDA 매출공유 모델(수급 약함); AVGO·MRVL AI인프라 수혜; 애플 생산상향 QCOM 물량 우호(모뎀 내재화 반대편); 하이닉스 SCA 상한배제",held:true,sim:false},
+ {d:"2026-07-04",src:"Citi",typ:"목표가변경",tk:["0100.HK"],dir:"약세",tc:"HK$1330→533 (-60%)",
+  th:"M3 수익화 정책 반발·락업 만료; 범용 AI 모델 수익화 취약",held:false,sim:false},
+ {d:"2026-07-05",src:"에테르리서치",typ:"헤드라인",tk:["005930.KS","000660.KS"],dir:"약세",tc:"",
+  th:"레노버 글로벌 노트북에 YMTC NAND 첫 채택 → 공급독점 균열",held:false,sim:false,
+  ind:"YMTC 진입 → NAND 공급과잉·협상력 약화 → 삼성·하이닉스 수익성 하락"},
+ {d:"2026-07-05",src:"에테르리서치",typ:"헤드라인",tk:[],dir:"중립",tc:"",
+  th:"삼성중공업 2028 2Q 부유식 데이터센터(FDC) 상업화",held:false,sim:false},
+ {d:"2026-07-05",src:"JP모건",typ:"헤드라인",tk:[],dir:"중립",tc:"",
+  th:"한국 원전 EPC: 두산에너빌리티 관심 90%; 대미 투자 연계 변수",held:false,sim:false},
+ // ---- 커버리지 시연용 표본 [SIM] ----
+ {d:"2026-07-17",src:"SIM·sellside",typ:"목표가변경",tk:["AVGO"],dir:"강세",tc:"$500→560 (+12%)",
+  th:"[표본] 커스텀 ASIC 수주·차세대 스위칭 물량 상향",held:false,sim:true},
+ {d:"2026-07-16",src:"SIM·sellside",typ:"실적프리뷰",tk:["ORCL"],dir:"약세",tc:"",
+  th:"[표본] OCI 캐펙스 부담·FCF 훼손 우려, RS 최하위와 정합",held:false,sim:true},
+ {d:"2026-07-15",src:"SIM·sellside",typ:"헤드라인",tk:["PWR","GEV"],dir:"강세",tc:"",
+  th:"[표본] 데이터센터 전력 백로그 확대, 전력 밸류체인 수혜",held:true,sim:true},
+ {d:"2026-07-14",src:"SIM·sellside",typ:"목표가변경",tk:["APP"],dir:"강세",tc:"$600→655 (+9%)",
+  th:"[표본] 광고 엔진 리텐션·eCPM 개선",held:true,sim:true},
+ {d:"2026-07-12",src:"SIM·sellside",typ:"헤드라인",tk:["NVDA","ORCL","NBIS"],dir:"중립",tc:"",
+  th:"[표본] 네오클라우드 멀티플 압축 논쟁 지속",held:true,sim:true},
+];
+
+/* 촉매 캘린더 — SIM 시드. LIVE 연결 시 Catalysts 탭(수동입력)으로 교체된다.
+   === [V38] const → let: tryLive가 실데이터로 갈아끼울 수 있어야 한다 === */
+let CATALYSTS = [
+ {d:"2026-07-09",tk:"0100.HK",ev:"MiniMax 최초 락업 해제",sim:false,past:true},
+ {d:"2026-07-24",tk:"GOOGL",ev:"[표본] 2Q 실적",sim:true},
+ {d:"2026-07-29",tk:"MSFT",ev:"[표본] FY 실적",sim:true},
+ {d:"2026-07-30",tk:"AVGO",ev:"[표본] AI 반도체 업데이트",sim:true},
+ {d:"2026-08-05",tk:"APP",ev:"[표본] 실적",sim:true},
+ {d:"2026-08-07",tk:"QCOM",ev:"[표본] 실적·오토모티브 수주",sim:true},
+ {d:"2026-08-12",tk:"NVDA",ev:"[표본] GTC 후속 코멘터리",sim:true},
+];
+
+/* ============================ 시드 히스토리 엔진 ============================ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function seedFor(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const std=a=>{const m=avg(a);return Math.sqrt(avg(a.map(x=>(x-m)**2)));};
+const pctRank=(a,v)=>a.filter(x=>x<=v).length/a.length*100;
+const fmt=(v,d=2)=>v==null||isNaN(v)?"—":(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=(v,d=1)=>v==null||isNaN(v)?"—":(v>=0?"+":"")+v.toFixed(d)+"%";
+const usd=(v,d=2)=>v==null||isNaN(v)?"—":"$"+v.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cls=v=>v>0?"up":v<0?"dn":"muted";
+
+function genDaily(tk,px,rs){
+  const r=mulberry32(seedFor(tk+"|dly"));
+  const N=130, vol=0.016+r()*0.022, drift=(rs/100)/N*1.4;
+  let c=[1]; for(let i=1;i<N;i++){c.push(c[i-1]*(1+drift+(r()*2-1)*vol));}
+  const sc=px/c[N-1]; c=c.map(x=>x*sc);
+  const hi=c.map(x=>x*(1+(0.25+r()*0.6)*vol)), lo=c.map(x=>x*(1-(0.25+r()*0.6)*vol));
+  return {c,hi,lo,vol};
+}
+function genWeekly(tk,e27,daily){
+  const r=mulberry32(seedFor(tk+"|wk")), W=26;
+  const dir=r()<0.5?-1:1, mag=0.0004+r()*0.0045;               // 리비전 드리프트
+  let eps=[],cur=e27; for(let i=0;i<W;i++){eps.unshift(cur);cur=cur/(1+dir*mag);}
+  const wp=[]; for(let i=0;i<W;i++){const idx=daily.c.length-1-(W-1-i)*5; wp.push(daily.c[Math.max(0,idx)]);}
+  const per=eps.map((e,i)=> e>0? wp[i]/e : null);
+  return {eps,per,wp,dir};
+}
+function genRS(tk,curRS){
+  const r=mulberry32(seedFor(tk+"|rs")), W=13; let s=[];
+  let v=curRS+(r()*2-1)*22;
+  for(let i=0;i<W-1;i++){s.push(v); v=v*0.72+(r()*2-1)*14;}
+  s.push(curRS); return s;                                     // 마지막=현재
+}
+function atr(d,p=14){const {c,hi,lo}=d,t=[];for(let i=1;i<c.length;i++){t.push(Math.max(hi[i]-lo[i],Math.abs(hi[i]-c[i-1]),Math.abs(lo[i]-c[i-1])));}const s=t.slice(-p);return avg(s);}
+const sma=(a,p)=>avg(a.slice(-p));
+const rmax=(a,p)=>Math.max(...a.slice(-p));
+
+/* === [V40] 주 1점 정리 — Code.gs weeklyPick과 같은 규칙 ===
+   ISO 주(월~일)마다: 그 주 첫 주말 행(토요일 우선), 주말 행이 없으면 가장 늦은 평일. */
+function weekKey(ds){
+  const d=new Date(String(ds).slice(0,10)+"T00:00:00Z"); if(isNaN(d))return null;
+  const dow=d.getUTCDay(); return new Date(d.getTime()-((dow+6)%7)*864e5).toISOString().slice(0,10);
+}
+function weeklyHist(obj){
+  const out={};
+  Object.keys(obj||{}).forEach(tk=>{
+    const arr=obj[tk]; if(!Array.isArray(arr))return;
+    const wk={};
+    arr.slice().sort((a,b)=>String(a[0]).localeCompare(String(b[0]))).forEach(p=>{
+      const ds=String(p[0]).slice(0,10), k=weekKey(ds); if(!k)return;
+      const dow=new Date(ds+"T00:00:00Z").getUTCDay(), we=(dow===0||dow===6), cur=wk[k];
+      if(!cur||(we&&!cur.we)||(!we&&!cur.we)) wk[k]={p:[ds,p[1]],we};
+    });
+    out[tk]=Object.keys(wk).sort().map(k=>wk[k].p);
+  });
+  return out;
+}
+/* RS 주간 시계열 + 머리점(대시보드 현재 RS). 대시보드 기준일이 히스토리 마지막 주보다
+   뒤의 주이면 한 점을 덧붙인다. 같은 주면 주간 대표값을 그대로 둔다. */
+function rsWeekly(tk,curRS){
+  const rh=LIVE_RSH[tk];
+  if(!rh||rh.length<2)return null;
+  const d=[],v=[];
+  rh.forEach(p=>{if(typeof p[1]==="number"&&isFinite(p[1])){d.push(String(p[0]).slice(0,10));v.push(p[1]);}});
+  if(v.length<2)return null;
+  const asof=String(CONFIG.ASOF||"").slice(0,10), last=d[d.length-1];
+  if(curRS!=null&&isFinite(curRS)&&asof>last&&weekKey(asof)!==weekKey(last)){d.push(asof);v.push(curRS);}
+  return {d,v};
+}
+/* 사분면 — RS × 4주 변화 */
+const QUAD={"주도":"#33d17a","약화":"#ffd23f","소외":"#ff5b5b","개선":"#4fd4ff"};
+const QUAD_TXT={"주도":"시장보다 강하고, 더 강해지는 중","약화":"시장보다 강하지만, 힘이 빠지는 중",
+                "소외":"시장보다 약하고, 더 약해지는 중","개선":"시장보다 약하지만, 좋아지는 중"};
+function quadOf(rs,d4){if(rs==null||d4==null||!isFinite(rs)||!isFinite(d4))return null;return rs>0?(d4>=0?"주도":"약화"):(d4>=0?"개선":"소외");}
+
+/* VIX 히스토리(백분위용) */
+const VIXH=(()=>{const r=mulberry32(seedFor("vix")),W=52,s=[];let v=CONFIG.VIX+(r()*2-1)*6;for(let i=0;i<W-1;i++){s.push(Math.max(10,v));v=v*0.6+14*0.4+(r()*2-1)*5;}s.push(CONFIG.VIX);return s;})();
+
+/* ============================ 데이터 조립 ============================ */
+const COLS=["tk","sec","px","rs","ud","tgt","gap","e26","e27","e28","p26","p27","p28","g27","g28","peg27","peg28"];
+let LIVE_ON=false;              // === [V22] 라이브 연결 성공 여부 (배너 표시용)
+let LIVE_STOP={};              // === [LIVE] 실측 ATR 손절가(Dashboard '보정 ATR 손절가') — 있으면 시드 계산값을 덮어씀
+/* === [V34] 추세 실측 (Python V32가 계산한 MA20·MA50·60일 고점·고점대비) ===
+   여기가 채워지기 전까지 `<MA20`·`DD-10` 배지는 genDaily()의 시드 일봉으로 판정됐다.
+   즉 손절가만 실측이고 나머지 둘은 가짜였다 — 없는 위반을 만들거나 있는 위반을 가릴 수 있었다. */
+let LIVE_MA={};
+let LAST_SYNC=null;            // === [V35] 마지막 동기화 시각 (상단 배지 표기용)
+let LIVE_STAGE={};             // === [V22] Weinstein 스테이지 라벨 (Dashboard '스테이지')
+let LIVE_EPSH={};              // === [V22] 실측 선행 EPS 히스토리 (Database 주간 스냅샷) {tk:[[date,eps],...]}
+let LIVE_RSH={};               // === [V23] 실측 RS 히스토리 (Database) {tk:[[date,rs],...]} — RRG·모멘텀용
+let JOURNAL=[];                // === [V23] 테제·매매일지·아이디어 (Journal 탭)
+/* === [V31] 배포된 GAS가 최신인지 추적 ===
+   doGet과 doPost는 같은 배포 번들에 들어간다. 따라서 doGet이 gasVer를 돌려주면
+   그 배포에는 doPost도 포함돼 있다는 뜻 — '재배포 했나?'를 추측하지 않고 확인할 수 있다. */
+let LIVE_GAS={ver:null,hasPost:false};
+let SAVING=false, LIVE_STALE=false, LIVE_MS=null;   // === [V42] 저장 중 · 갱신 지연 · 서버 처리시간
+/* === [V38] 섹터 EPS (SectorEPS 탭 수동입력) — LIVE 전에는 빈 값 === */
+let SECTOR_EPS={years:[],rows:[],asof:""};
+let VIOL=[];                   // === [V23] 보유 중 규칙 위반 목록 (상단바 배지)
+let LIVE_INDEX=null;           // === [V24] S&P 500 지수 밸류에이션 (FactSet EPS 기반)
+let MODAL=false;               // === [V24] 뉴스 팝업 열림 상태
+let U=[],BY={},SX=[],REG={},PORT={},BT={};
+
+/* 뉴스 → 종목 심리 사이드카 집계 (방안 1) */
+const DVAL={"강세":1,"약세":-1,"중립":0};
+/* === [V36] 뉴스 정렬 기준 — 날짜 → 시각 → (동률이면 GAS가 준 순서 유지) ===
+   날짜만으로 비교하면 같은 날 리포트가 전부 동률이 되고, 안정 정렬이 원래 배열 순서를
+   그대로 두기 때문에 '오래된 것이 위'로 보였다. GAS가 넘겨주는 수집 시각(t)을 함께 본다. */
+function newsCmp(a,b){
+  const c=String(b.d||"").localeCompare(String(a.d||""));
+  if(c)return c;
+  return String(b.t||"").localeCompare(String(a.t||""));
+}
+/* 목록에 찍을 시각 (없으면 빈칸 — 구버전 GAS 호환) */
+function newsTime(n){return n&&n.t?` <span class="muted">${esc(n.t)}</span>`:"";}
+
+function newsFor(tk,days){const now=new Date(CONFIG.ASOF);return NEWS.filter(n=>n.tk.includes(tk)&&(Math.abs(now-new Date(n.d))/864e5)<=days);}
+
+/* === [LIVE] 조립 로직을 함수로 분리 — 최초 1회(SIM) + 라이브 fetch 성공 후 재호출 === */
+function rebuildAll(){
+  NEWS.forEach((n,i)=>n._i=i);   // === [V24] 팝업 참조용 인덱스
+  U=RAW.map(row=>{const o={};COLS.forEach((k,i)=>o[k]=row[i]);
+    const h=HOLD[o.tk]; o.held=!!h; if(h){o.avg=h.avg;o.qty=h.qty;o.pnl=(o.px/h.avg-1)*100;o.mv=o.px*h.qty;o.cost=h.avg*h.qty;o.upl=o.mv-o.cost;}
+    const d=genDaily(o.tk,o.px,o.rs); o._d=d;
+    const w=genWeekly(o.tk,o.e27,d); o._w=w;
+    const rsH=genRS(o.tk,o.rs); o._rs=rsH;
+    // 리스크
+    o.atr=atr(d); o.stop=o.px-CONFIG.ATR_N*o.atr; o.ma20=sma(d.c,20); o.ma50=sma(d.c,50);
+    o.hi60=rmax(d.c,60); o.ddFromHi=(o.px/o.hi60-1)*100;
+    // === [LIVE] 실측 손절가가 있으면(Dashboard가 ATR20·베타·VIX로 실계산한 값) 시드 대신 사용 ===
+    if(LIVE_STOP[o.tk]!=null) o.stop=LIVE_STOP[o.tk];
+    // === [V34] 실측 추세 수준이 있으면 시드값을 덮어쓴다 (항목별로 개별 적용) ===
+    //     신규 상장 종목은 MA50만 없을 수 있으므로 있는 것만 교체한다.
+    const _m=LIVE_MA[o.tk];
+    o.maReal=false;
+    if(_m){
+      if(_m.ma20!=null){o.ma20=_m.ma20; o.maReal=true;}
+      if(_m.ma50!=null) o.ma50=_m.ma50;
+      if(_m.hi60!=null) o.hi60=_m.hi60;
+      if(_m.dd  !=null) o.ddFromHi=_m.dd;
+    }
+    o.fStop=o.px<o.stop; o.fMA=o.px<o.ma20; o.fDD=o.ddFromHi<=-10;
+    // 리비전
+    o.wow=(w.eps[w.eps.length-1]/w.eps[w.eps.length-2]-1)*100;
+    o.rev4=(w.eps[w.eps.length-1]/w.eps[w.eps.length-5]-1)*100;
+    o.epsSeries=w.eps; o.epsReal=false;
+
+    // === [V22] 실측 EPS 히스토리(Database 주간 스냅샷)가 있으면 시드 대신 사용 ===
+    const eh=LIVE_EPSH[o.tk];
+    if(eh&&eh.length>=2){
+      const ser=eh.map(x=>x[1]).filter(v=>typeof v==="number"&&isFinite(v)&&v!==0);
+      if(ser.length>=2){
+        o.epsSeries=ser; o.epsReal=true; o.epsN=ser.length;
+        o.wow=(ser[ser.length-1]/ser[ser.length-2]-1)*100;
+        o.rev4=ser.length>=5?(ser[ser.length-1]/ser[ser.length-5]-1)*100:null;
+      }
+    }
+    // === [V22] Weinstein 스테이지 (Python이 주봉 30주선으로 판정한 실측값) ===
+    o.stage=LIVE_STAGE[o.tk]||null;
+    o.stageNum=o.stage?parseInt(o.stage,10)||null:null;
+
+    // 밸류 z
+    const pv=w.per.filter(x=>x!=null);
+    if(pv.length>4&&o.p27!=null){o.pz=(o.p27-avg(pv))/std(pv); o.ppct=pctRank(pv,o.p27);} else {o.pz=null;o.ppct=null;}
+    o.rsMom=o.rs-rsH[rsH.length-5];                              // RS 4주 모멘텀
+    // === [V23] 실측 RS 히스토리가 있으면 모멘텀·추이를 실데이터로 ===
+    // === [V40] 주 1점 + 머리점(대시보드 RS) → 진짜 4주 변화
+    const rw=rsWeekly(o.tk,o.rs);
+    if(rw){
+      const rv=rw.v;
+      o._rs=rv; o.rsReal=true; o.rsN=rv.length;
+      o.rsMom=rv.length>=5?rv[rv.length-1]-rv[rv.length-5]:rv[rv.length-1]-rv[0];
+    }
+    return o;
+  });
+  BY=Object.fromEntries(U.map(o=>[o.tk,o]));
+  VIOL=U.filter(o=>o.held&&(o.fStop||o.fMA||o.fDD));   // === [V23] 룰-위반 배지용
+  SX=SECT.map(s=>{const o={tk:s[0],px:s[1],rs:s[2],ud:s[3],name:s[4],grp:s[5],
+      stage:s[6]!=null&&s[6]!==""?String(s[6]).trim():null, dd:(s[7]!=null&&isFinite(s[7]))?s[7]:null};   // === [V40] [6]스테이지 [7]고점대비
+    o._rs=genRS(o.tk+"s",o.rs);o._rsD=null;o.rsReal=false;
+    // === [V23] 섹터 ETF RS도 Database 실측으로 (있으면) — [V40] 주 1점 + 머리점
+    const rw=rsWeekly(o.tk,o.rs);
+    if(rw){o._rs=rw.v;o._rsD=rw.d;o.rsReal=true;o.rsN=rw.v.length;}
+    const r=o._rs, n=r.length;
+    o.mom=n>=5?r[n-1]-r[n-5]:null;
+    o.q=r.map((v,i)=>i>=4?quadOf(v,v-r[i-4]):null);                       // 주별 사분면
+    o.quad=o.q[n-1];
+    let st=0; for(let i=n-1;i>=4&&o.q[i]===o.quad;i--)st++; o.streak=st;    // 현재 칸 연속 주수
+    return o;});
+  // === [V40] RS 순위 (지금 · 4주 전)
+  const _r4=s=>s._rs.length>=5?s._rs[s._rs.length-5]:null;
+  SX.forEach(s=>{s._r0=null;s._r4=null;});
+  SX.filter(s=>s.rs!=null).sort((a,b)=>b.rs-a.rs).forEach((s,i)=>s._r0=i+1);
+  SX.filter(s=>_r4(s)!=null).sort((a,b)=>_r4(b)-_r4(a)).forEach((s,i)=>s._r4=i+1);
+
+  U.forEach(o=>{
+    const n30=newsFor(o.tk,30), n7=newsFor(o.tk,7);
+    o.nCnt30=n30.length; o.nCnt7=n7.length;
+    o.nSent=n30.length? avg(n30.map(x=>DVAL[x.dir])) : null;
+    o.nLastTC=(n30.find(x=>x.tc)||{}).tc||"";
+    o.nBearHeld=o.held && n7.some(x=>x.dir==="약세");
+  });
+
+  /* 시장 레짐 (방안 6) */
+  REG=(()=>{
+    const brdRS=SX.filter(s=>s.rs>0).length, brdUD=SX.filter(s=>s.ud>1).length;
+    const def=avg(SX.filter(s=>s.grp==="def").map(s=>s.rs)), cyc=avg(SX.filter(s=>s.grp==="cyc").map(s=>s.rs));
+    const spread=cyc-def;                                         // >0 risk-on
+    const vixPct=pctRank(VIXH,CONFIG.VIX);
+    const vixBand=CONFIG.VIX<15?"CALM":CONFIG.VIX<20?"NORMAL":CONFIG.VIX<30?"ELEVATED":"STRESS";
+    let score=0; score+=brdRS>=6?1:brdRS>=4?0:-1; score+=spread>2?1:spread<-2?-1:0; score+=CONFIG.VIX<18?1:CONFIG.VIX>24?-1:0;
+    const light=score>=2?["RISK-ON","up"]:score<=-1?["RISK-OFF","dn"]:["NEUTRAL","warn"];
+    return {brdRS,brdUD,def,cyc,spread,vixPct,vixBand,score,light};
+  })();
+
+  /* 포트폴리오 집계 (방안 5) */
+  PORT=(()=>{const h=U.filter(o=>o.held);const mv=h.reduce((a,o)=>a+o.mv,0),cost=h.reduce((a,o)=>a+o.cost,0);
+    const upl=mv-cost; const secW={}; h.forEach(o=>secW[o.sec]=(secW[o.sec]||0)+o.mv);
+    return {h,mv,cost,upl,ret:(mv/cost-1)*100,secW};})();
+
+  /* 신호 백테스트 (방안 10) — 시드 주간 데이터 위, 유니버스 집계 */
+  BT=(()=>{
+    let a4=[],aZ=[];
+    U.forEach(o=>{const rs=o._rs, wp=o._w.wp, per=o._w.per;
+      for(let i=1;i<rs.length-4&&i<wp.length-4;i++){                 // RS 0선 상향 돌파 → 4주
+        if(rs[i-1]<0&&rs[i]>=0){a4.push((wp[i+4]/wp[i]-1)*100);}
+      }
+      for(let i=0;i<per.length-4;i++){                               // 자기PER z<-1 → 4주
+        const hist=per.slice(0,i+1).filter(x=>x!=null); if(hist.length>5&&per[i]!=null){const z=(per[i]-avg(hist))/(std(hist)||1); if(z<-1)aZ.push((wp[i+4]/wp[i]-1)*100);}
+      }
+    });
+    const sum=a=>a.length?{n:a.length,avg:avg(a),hit:a.filter(x=>x>0).length/a.length*100}:{n:0,avg:0,hit:0};
+    return {rsX:sum(a4), zLow:sum(aZ)};
+  })();
+}
+rebuildAll();   // 최초 1회 실행 (SIM 데이터로 조립 — 기존 동작과 동일)
+
+/* ============================ 함수 레지스트리 ============================ */
+const FUNCS=["NEWS","CAT","MAP","RISK","PORT","REGIME","RRG","REV","VAL","SIG","STAGE","THESIS"];
+const FMETA={
+ NEWS:["종목별 뉴스 사이드카","정성×정량 융합: 심리 스코어·목표가변동·보유종목 약세 경보"],
+ CAT:["촉매 캘린더","보유종목 관련 예정 이벤트를 시간축으로"],
+ MAP:["공급망·테마 파급 맵","리포트 1건의 2차 파급을 링크로 전파"],
+ RISK:["ATR 손절·규칙 엔진","ATR 손절·20일선·고점대비 -10% 규칙 상태"],
+ PORT:["포지션·손익 블로터","평가액·미실현손익·비중·리스크"],
+ REGIME:["시장 레짐·브레드스","VIX·섹터 브레드스·방어vs경기민감"],
+ RRG:["섹터 로테이션 보드","RS × 4주 변화 사분면 · 13주 흐름 · 이번 주 전이"],   // === [V40]
+ REV:["EPS 리비전 모멘텀","선행 EPS 주간·4주 변화 + 목표가 리비전"],
+ VAL:["밸류에이션 Z-스코어","자기 PER 히스토리 대비 위치"],
+ SIG:["신호 백테스트·애널리스트 원장","신호의 과거 성과와 브로커 콜 검증"],
+ STAGE:["와인스타인 스테이지","주봉 30주선 기준 4단계 · 보유 포지션 국면 점검"],
+ THESIS:["테제 카드·매매일지","투자 논지+반증조건 카드 · 매매일지·아이디어 기록 (Journal 탭)"],
+};
+
+/* ============================ 렌더 유틸 ============================ */
+const el=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const symTd=tk=>`<td class="sym" data-cmd="${tk}">${tk}</td>`;
+const symLink=tk=>`<span class="k" data-cmd="${tk}">${tk}</span>`;
+function barSpan(v,max,color){const w=Math.min(100,Math.abs(v)/max*100);return `<span class="bar" style="width:${w}px;background:${color}"></span>`;}
+function spark(arr,w=120,h=26,color="#4fd4ff"){
+  const mn=Math.min(...arr),mx=Math.max(...arr),rng=(mx-mn)||1;
+  const pts=arr.map((v,i)=>`${(i/(arr.length-1)*w).toFixed(1)},${(h-((v-mn)/rng)*h).toFixed(1)}`).join(" ");
+  return `<svg width="${w}" height="${h}">${arr.length>1?`<polyline fill="none" stroke="${color}" stroke-width="1.3" points="${pts}"/>`:""}</svg>`;
+}
+function ph(t,rt=""){return `<div class="ph">${t}<span class="rt">${rt}</span></div>`;}
+
+/* === [V33] TradingView 차트 패널 (종목 상세 최상단) === */
+let TV_TF="D";                       // 시간축 D/W/M — 화면을 옮겨도 유지
+function tvSymbol(tk){return (CONFIG.TV_MAP&&CONFIG.TV_MAP[tk])||tk;}
+function tvSetTf(tf){TV_TF=tf;render();}
+function tvPanel(tk){
+  if(!CONFIG.TV_ENABLE)return "";
+  const sym=tvSymbol(tk), e=encodeURIComponent(sym);
+  const url=`https://s.tradingview.com/widgetembed/?symbol=${e}&interval=${TV_TF}`
+    +`&theme=dark&style=1&locale=kr&timezone=Asia%2FSeoul&toolbarbg=161b22`
+    +`&hidesidetoolbar=1&symboledit=0&saveimage=0&withdateranges=1`;
+  const btn=(v,l)=>`<span class="k ${TV_TF===v?"amber b":"muted"}" onclick="tvSetTf('${v}')">${l}</span>`;
+  const rt=`${esc(sym)} · ${btn("D","일")} ${btn("W","주")} ${btn("M","월")}`
+    +` · <a class="k" href="https://www.tradingview.com/chart/?symbol=${e}" target="_blank" rel="noopener">↗ 크게</a>`;
+  return `<div class="panel">${ph("CHART",rt)}<div class="pb" style="padding:0">
+     <iframe src="${url}" title="TradingView ${esc(sym)}" loading="lazy" scrolling="no"
+       style="width:100%;height:${CONFIG.TV_HEIGHT};min-height:280px;border:0;display:block"></iframe>
+   </div></div>`;
+}
+
+/* === [V33] 도넛 차트 (포지션 비중) — 라이브러리 없이 SVG stroke-dasharray로 === */
+const DONUT_COLORS=["#ffb000","#4fd4ff","#33d17a","#c08cff","#ff5b5b","#ffd23f",
+                    "#5ab0ff","#8ce99a","#ff9f6e","#b0b8c4","#e879f9","#2dd4bf"];
+function donutSvg(items,size,thick){
+  const total=items.reduce((a,it)=>a+it.v,0);
+  if(!(total>0))return "";
+  const R=(size-thick)/2, C=2*Math.PI*R, cx=size/2, cy=size/2;
+  let off=0;
+  const segs=items.map(it=>{
+    const len=C*(it.v/total);
+    const s=`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${it.c}"
+      stroke-width="${thick}" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}"
+      stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"
+      ><title>${esc(it.k)} ${(it.v/total*100).toFixed(1)}%</title></circle>`;
+    off+=len; return s;
+  }).join("");
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="display:block">
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#161b22" stroke-width="${thick}"/>
+    ${segs}</svg>`;
+}
+
+/* ================================ VIEWS ================================ */
+function vHeader(code,extra=""){const m=FMETA[code]||["",""];return `<div class="viewhdr"><span class="code">${code}</span><span class="ttl">${m[0]}</span><span class="sub">${m[1]}${extra}</span></div>`;}
+
+function vMenu(){
+  const tiles=FUNCS.map((f,i)=>`<div class="tile" data-cmd="${f}"><span class="num">${i+1}</span><div class="code">${f}</div><div class="nm">${FMETA[f][0]}</div><div class="ko">${FMETA[f][1].split(":")[0]}</div></div>`).join("");
+  // 모니터 스트립
+  const alerts=[];
+  U.forEach(o=>{if(o.held&&o.fMA)alerts.push([o.tk,"20일선 하회","dn"]); if(o.held&&o.fDD)alerts.push([o.tk,"고점 -10%↓","dn"]); if(o.nBearHeld)alerts.push([o.tk,"보유종목 약세 리포트","warn"]);});
+  U.filter(o=>o.held).forEach(o=>{if(o.pnl<-20)alerts.push([o.tk,`미실현 ${pct(o.pnl)}`,"dn"]);});
+  const alertHtml=alerts.length?alerts.map(a=>`<div>${symLink(a[0])} <span class="${a[2]}">${a[1]}</span></div>`).join(""):`<span class="muted">경보 없음</span>`;
+  const topNews=NEWS.slice().sort(newsCmp).slice(0,5).map(n=>`<div class="mono-sm"><span class="muted">${n.d.slice(5)}${n.t?" "+esc(n.t):""}</span> <span class="${n.dir==='강세'?'up':n.dir==='약세'?'dn':'muted'}">${n.dir}</span> ${n.tk.map(t=>BY[t]?symLink(t):`<span class='muted'>${esc(t)}</span>`).join(",")||"<span class='muted'>—</span>"} <span class="muted">${esc(n.th).slice(0,54)}…</span> ${n.sim?"<span class='tag muted'>SIM</span>":""}</div>`).join("");
+  const rev=U.filter(o=>o.e27>0).slice().sort((a,b)=>b.rev4-a.rev4);
+  const revUp=rev.slice(0,3),revDn=rev.slice(-3).reverse();
+  return vHeader("MENU")+
+   (LIVE_ON
+     ?`<div class="banner" style="border-color:var(--up);color:var(--up)">● LIVE — 구글시트 실데이터 연결됨 (기준일 ${CONFIG.ASOF}). Dashboard·Holdings·Database·telegram_report_index 반영. 티커/함수코드 입력 또는 타일 클릭.</div>`
+     :(!CONFIG.LIVE_URL
+       ?`<div class="banner">◆ SIM FEED — 데모 데이터로 구동 중입니다. 실데이터를 보려면 명령창에 <b class=\"k\" data-cmd=\"SETUP\">SETUP</b> 입력(또는 하단 ⚙) 후 Apps Script 웹앱 URL을 넣으세요. 티커/함수코드 입력 또는 타일 클릭.</div>`
+       :(LAST_LIVE_ERR
+         ?`<div class="banner" style="border-color:var(--warn);color:var(--warn)">◆ 실데이터 연결 실패 — 지금 화면은 데모 데이터입니다. 자동으로 다시 시도합니다(R: 즉시). 사유: ${esc(LAST_LIVE_ERR)}</div>`
+         :`<div class="banner">◌ 실데이터 연결 중… (서버 응답까지 보통 수 초, 최대 45초)</div>`)))+
+   `<div class="tiles">${tiles}</div>`+
+   `<div class="grid g3">
+     <div class="panel">${ph("MARKET REGIME","6 REGIME")}<div class="pb">
+        <div><span class="dot" style="background:var(--${REG.light[1]})"></span><span class="${REG.light[1]} kpi">${REG.light[0]}</span></div>
+        <div class="sep"></div>
+        <div>VIX <span class="warn b">${CONFIG.VIX}</span> <span class="muted">(${REG.vixBand}, ${REG.vixPct.toFixed(0)}%ile)</span></div>
+        <div>브레드스 <span class="b">${REG.brdRS}/11</span> <span class="muted">섹터 RS&gt;0</span></div>
+        <div>경기민감−방어 <span class="${cls(REG.spread)} b">${fmt(REG.spread)}</span></div>
+     </div></div>
+     <div class="panel">${ph("PORTFOLIO P/L","5 PORT")}<div class="pb">
+        <div>미실현 <span class="${cls(PORT.upl)} kpi">${pct(PORT.ret)}</span></div>
+        <div class="muted">${usd(PORT.upl,0)} · 평가액 ${usd(PORT.mv,0)}</div>
+        <div class="sep"></div>
+        ${PORT.h.slice().sort((a,b)=>b.pnl-a.pnl).map(o=>`<div>${symLink(o.tk)} <span class="${cls(o.pnl)}">${pct(o.pnl)}</span></div>`).join("")}
+     </div></div>
+     <div class="panel">${ph("ALERTS","4 RISK")}<div class="pb">${alertHtml}</div></div>
+   </div>
+   <div class="grid g2">
+     <div class="panel">${ph("LATEST RESEARCH","1 NEWS")}<div class="pb">${topNews}</div></div>
+     <div class="panel">${ph("EST REVISION 4W","8 REV")}<div class="pb">
+        <div class="up b">▲ 상향</div>${revUp.map(o=>`<div>${symLink(o.tk)} <span class="up">${pct(o.rev4)}</span></div>`).join("")}
+        <div class="sep"></div><div class="dn b">▼ 하향</div>${revDn.map(o=>`<div>${symLink(o.tk)} <span class="dn">${pct(o.rev4)}</span></div>`).join("")}
+     </div></div>
+   </div>`;
+}
+
+function vNews(){
+  const rows=U.slice().sort((a,b)=>(b.nSent??-9)-(a.nSent??-9)).map(o=>{
+    const s=o.nSent, col=s==null?"muted":s>0?"up":s<0?"dn":"muted";
+    const chip=s==null?`<span class="muted">—</span>`:`<span class="${col} b">${s>0?"강세":s<0?"약세":"중립"} ${fmt(s,2)}</span>`;
+    return `<tr class="row">${symTd(o.tk)}<td>${o.held?"<span class='cyan'>●</span>":""}</td><td>${chip}</td><td>${o.nCnt7||"·"}</td><td>${o.nCnt30||"·"}</td><td class="${o.nLastTC.includes('-')?'dn':o.nLastTC?'up':''}">${esc(o.nLastTC)||"—"}</td><td>${o.nBearHeld?"<span class='dn tag'>보유·약세</span>":""}</td><td class="mono-sm" style="text-align:left;max-width:340px;overflow:hidden">${(newsFor(o.tk,30)[0]?esc(newsFor(o.tk,30)[0].th).slice(0,58):"<span class='muted'>커버리지 없음</span>")}</td></tr>`;
+  }).join("");
+  const feed=NEWS.slice().sort(newsCmp).map(n=>`<tr class="row" data-news="${n._i}"><td class="mono-sm">${n.d.slice(5)}${newsTime(n)}</td><td style="text-align:left">${esc(n.src)}</td><td style="text-align:left">${esc(n.typ)}</td><td style="text-align:left">${n.tk.map(t=>BY[t]?symLink(t):`<span class='muted'>${esc(t)}</span>`).join(", ")||"—"}</td><td class="${n.dir==='강세'?'up':n.dir==='약세'?'dn':'muted'}">${n.dir}</td><td style="text-align:left" class="mono-sm">${esc(n.th).slice(0,70)}${n.sim?" <span class='tag muted'>SIM</span>":""}</td></tr>`).join("");
+  return vHeader("NEWS")+
+   `<div class="panel">${ph("종목별 심리 사이드카","방향성 강세+1 / 약세-1 / 중립0 · 30일 평균")}<div class="pb"><table>
+     <tr><th>티커</th><th>보유</th><th>심리</th><th>7D</th><th>30D</th><th>최근 목표가Δ</th><th>플래그</th><th style="text-align:left">최근 논지</th></tr>${rows}</table>
+     <div class="muted mono-sm" style="margin-top:6px">※ 밸류트랩 탐지: 괴리율 큰데 심리 약세면 경보. 예) ORCL 괴리율 99% + 심리/RS 최하위.</div></div></div>
+   <div class="panel">${ph("RESEARCH FEED","telegram_report_index · 행 클릭 → 원문 팝업")}<div class="pb"><table>
+     <tr><th>일자</th><th style="text-align:left">출처</th><th style="text-align:left">유형</th><th style="text-align:left">티커</th><th>방향성</th><th style="text-align:left">핵심논지</th></tr>${feed}</table></div></div>`;
+}
+
+function vCat(){
+  /* === [V38] Catalysts 탭(수동입력) 연동 ===
+     실적·락업 같은 확정 일정은 리포트에서 추출할 성질이 아니라 미리 아는
+     소수의 사실이다. 지수 EPS와 같은 방식(수동입력)으로 간다.
+     중요도(H/M/L)로 색을 달리해, 같은 D-데이라도 무게가 구분되게 했다. */
+  const now=new Date(CONFIG.ASOF);
+  const live=CATALYSTS.some(c=>c.sim===false);
+  const IMP={H:["높음","dn b"],M:["보통","amber"],L:["낮음","muted"]};
+  const rows=CATALYSTS.slice().sort((a,b)=>a.d.localeCompare(b.d)).map(c=>{
+    const dd=Math.round((new Date(c.d)-now)/864e5);
+    const held=BY[c.tk]&&BY[c.tk].held;
+    const [iLbl,iCls]=IMP[c.imp]||IMP.M;
+    // 임박(D-7 이내) + 보유 + 중요도 H 이면 행 전체를 강조
+    const hot=(dd>=0&&dd<=7&&held&&c.imp==="H");
+    return `<tr class="row"${hot?' style="background:rgba(255,80,80,.07)"':''}>`+
+      `<td>${c.d}</td>`+
+      `<td class="${dd<0?'muted':dd<=7?'warn b':''}">${dd<0?"지남":"D-"+dd}</td>`+
+      `${BY[c.tk]?symTd(c.tk):`<td class='muted'>${esc(c.tk)}</td>`}`+
+      `<td>${held?"<span class='cyan'>●</span>":""}</td>`+
+      `<td style="text-align:left">${esc(c.ev)}${c.memo?`<span class="muted mono-sm"> · ${esc(c.memo)}</span>`:""}</td>`+
+      `<td class="${iCls}">${iLbl}</td>`+
+      `<td>${c.sim?"<span class='tag muted'>SIM</span>":"<span class='tag' style='color:var(--up)'>실</span>"}</td></tr>`;
+  }).join("");
+  const near=CATALYSTS.filter(c=>{const dd=Math.round((new Date(c.d)-now)/864e5);
+    return dd>=0&&dd<=7&&BY[c.tk]&&BY[c.tk].held;}).length;
+  return vHeader("CAT")+
+   `<div class="banner">${live
+      ? `Catalysts 탭 연동 중 · 보유종목 7일 내 이벤트 <b class="${near?'warn':'muted'}">${near}건</b>. 일정 추가는 시트 Catalysts 탭에 한 줄 쓰면 됩니다.`
+      : `SIM 표본입니다. 시트에 <b>Catalysts</b> 탭을 만들고 <b>일자 · 티커 · 이벤트 · 중요도 · 메모</b> 순으로 입력하면 실데이터로 바뀝니다.`}</div>
+    <div class="panel">${ph("CATALYST CALENDAR","D-데이 · 보유종목 우선")}<div class="pb"><table>
+     <tr><th>일자</th><th>D-데이</th><th>티커</th><th>보유</th><th style="text-align:left">이벤트</th><th>중요도</th><th>출처</th></tr>${rows}</table></div></div>`;
+}
+
+function vMap(){
+  const themeRows=Object.entries(THEMES).map(([t,ts])=>`<tr class="row"><td style="text-align:left" class="amber b">${t}</td><td style="text-align:left">${ts.map(x=>BY[x]?symLink(x):esc(x)).join(" · ")}</td></tr>`).join("");
+  // 최근 뉴스의 파급
+  const recent=NEWS.filter(n=>n.tk.some(t=>BY[t])).sort(newsCmp).slice(0,6);
+  const ripple=recent.map(n=>{
+    const hit=n.tk.filter(t=>BY[t]);
+    const nbrs=new Set(); hit.forEach(t=>LINKS.forEach(l=>{if(l[0]===t)nbrs.add(l[1]+"|"+l[2]);if(l[1]===t)nbrs.add(l[0]+"|"+l[2]);}));
+    hit.forEach(t=>nbrs.forEach(()=>{})); const nb=[...nbrs].filter(x=>!hit.includes(x.split("|")[0]));
+    const col=n.dir==='강세'?'up':n.dir==='약세'?'dn':'muted';
+    return `<div style="margin-bottom:6px"><span class="muted">${n.d.slice(5)}</span> <span class="${col} b">${n.dir}</span> → 직접 ${hit.map(symLink).join(",")} ${n.sim?"<span class='tag muted'>SIM</span>":""}
+      <div class="mono-sm muted" style="margin-left:14px">${esc(n.ind||n.th).slice(0,70)}</div>
+      <div style="margin-left:14px">2차 파급 ▸ ${nb.length?nb.map(x=>{const[t,r]=x.split("|");return `${symLink(t)}<span class="muted">(${esc(r)})</span>`;}).join(" · "):"<span class='muted'>없음</span>"}</div></div>`;
+  }).join("");
+  const linkRows=LINKS.map(l=>`<tr class="row">${symTd(l[0])}<td class="muted">↔</td>${symTd(l[1])}<td style="text-align:left" class="muted">${esc(l[2])}</td></tr>`).join("");
+  return vHeader("MAP")+
+   `<div class="grid g2">
+     <div class="panel">${ph("2차 파급 (최근 리서치)","간접영향 전파")}<div class="pb">${ripple||"<span class='muted'>해당 리포트 없음</span>"}</div></div>
+     <div class="panel">${ph("THEME MAP","테마 → 구성 종목")}<div class="pb"><table>${themeRows}</table></div></div>
+   </div>
+   <div class="panel">${ph("SUPPLY-CHAIN LINKS","티커 인접 관계")}<div class="pb"><table><tr><th>A</th><th></th><th>B</th><th style="text-align:left">관계</th></tr>${linkRows}</table></div></div>`;
+}
+
+function vRisk(){
+  /* === [V23] 손절 거리 게이지 (보유 종목) — 눈금 5%/10%, 축 0~25% === */
+  const heldG=U.filter(o=>o.held&&isFinite(o.stop)&&o.stop>0)
+    .slice().sort((a,b)=>(a.px/a.stop)-(b.px/b.stop));
+  const gauges=heldG.map(o=>{
+    const d=(o.px/o.stop-1)*100;                    // 손절선 위 여유 % (음수 = 이탈)
+    const w=Math.max(0,Math.min(100,d/25*100));
+    const col=d<=0?'#ff5b5b':d<5?'#ff5b5b':d<10?'#ffd23f':'#33d17a';
+    const lbl=d<=0?`<span class="dn b">이탈 ${pct(d)}</span>`
+             :d<10?`<span class="warn b">${pct(d)}</span>`
+             :`<span class="up">${pct(d)}</span>`;
+    return `<div style="margin-bottom:7px">${symLink(o.tk)} ${lbl} <span class="muted mono-sm">현재 ${usd(o.px)} · 손절 ${usd(o.stop)}</span>
+      <div style="height:9px;background:#161b22;border:1px solid var(--bd);margin-top:2px;position:relative">
+        <div style="height:100%;width:${w.toFixed(1)}%;background:${col};opacity:.65"></div>
+        <div style="position:absolute;left:20%;top:-2px;bottom:-2px;width:1px;background:#ff5b5b;opacity:.55"></div>
+        <div style="position:absolute;left:40%;top:-2px;bottom:-2px;width:1px;background:#ffd23f;opacity:.55"></div>
+      </div></div>`;
+  }).join("");
+
+  const rows=U.slice().sort((a,b)=>(a.ddFromHi)-(b.ddFromHi)).map(o=>{
+    const flags=[o.fStop?"<span class='dn tag'>STOP</span>":"",o.fMA?"<span class='warn tag'>&lt;MA20</span>":"",o.fDD?"<span class='dn tag'>DD-10</span>":""].filter(Boolean).join(" ")||"<span class='up'>정상</span>";
+    return `<tr class="row">${symTd(o.tk)}<td>${o.held?"<span class='cyan'>●</span>":""}</td><td>${usd(o.px)}</td><td>${usd(o.stop)}</td><td class="${o.px<o.stop?'dn':'muted'}">${pct((o.px/o.stop-1)*100)}</td><td>${usd(o.ma20)}</td><td class="${cls(o.px-o.ma20)}">${o.px<o.ma20?'하회':'상회'}</td><td class="${cls(o.ddFromHi)}">${pct(o.ddFromHi)}</td><td style="text-align:left">${flags}</td></tr>`;
+  }).join("");
+  const heldHit=VIOL;
+  return vHeader("RISK",` · ATR n=${CONFIG.ATR_N}`)+
+   (heldHit.length?`<div class="banner">⚠ 보유종목 규칙 트리거 ${heldHit.length}건: ${heldHit.map(o=>symLink(o.tk)).join(", ")} — 손절/재검토 대상. (메모: 규칙 위반 상태 방치 회피)</div>`:"")+
+   `<div class="grid g2">
+     <div class="panel">${ph("손절 거리 게이지 · 보유","여유 = 현재가/손절가 − 1 · 눈금 5%·10% · 축 0~25%")}<div class="pb">${gauges||"<span class='muted'>보유 종목 없음 또는 손절가 미산출</span>"}
+       <div class="muted mono-sm" style="margin-top:4px">빨강 &lt;5% · 노랑 5~10% · 초록 &gt;10%. 래칫 손절이라 여유는 줄기만 하고 늘지 않음 — 5% 미만은 사실상 임박.</div></div></div>
+     <div class="panel">${ph("규칙 요약")}<div class="pb">
+       <div class="mono-sm"><span class="dn b">STOP</span> 현재가 ≤ 보정 ATR 손절가 (Dashboard 실측·래칫)</div>
+       <div class="mono-sm"><span class="warn b">&lt;MA20</span> 20일선 하회 — 단기 추세 이탈</div>
+       <div class="mono-sm"><span class="dn b">DD-10</span> 60일 고점 대비 −10% — 포지션 재검토 트리거</div>
+       <div class="sep"></div>
+       <div class="muted mono-sm">위반 발생 시 상단바에 ⚠ 배지가 모든 화면에서 표시됩니다.</div></div></div>
+   </div>
+   <div class="panel">${ph("STOP & RULE ENGINE",(()=>{
+       /* === [V34] 판정 근거가 실측인지 시드인지 밝힌다 ===
+          MA20·고점대비가 시드일 때 룰위반 배지는 신뢰할 수 없다. 숨기지 않고 표시한다. */
+       const n=U.filter(o=>o.maReal).length;
+       return n===U.length&&n>0 ? `<span class="tag up">MA·DD 실측 ${n}/${U.length}</span>`
+            : n>0 ? `<span class="tag warn">MA·DD 실측 ${n}/${U.length} · 나머지 SIM</span>`
+                  : `<span class="tag dn">MA·DD 전부 SIM — 판정 신뢰 불가</span>`;
+     })())}<div class="pb"><table>
+     <tr><th>티커</th><th>보유</th><th>현재가</th><th>ATR손절</th><th>손절까지</th><th>MA20</th><th>추세</th><th>고점대비</th><th style="text-align:left">규칙상태</th></tr>${rows}</table></div></div>`;
+}
+
+function vPort(){
+  const rows=PORT.h.slice().sort((a,b)=>b.mv-a.mv).map(o=>{
+    const w=o.mv/PORT.mv*100, riskAmt=(o.px-o.stop)*o.qty;
+    return `<tr class="row">${symTd(o.tk)}<td>${o.qty}</td><td>${usd(o.avg)}</td><td>${usd(o.px)}</td><td class="${cls(o.pnl)} b">${pct(o.pnl)}</td><td class="${cls(o.upl)}">${usd(o.upl,0)}</td><td>${usd(o.mv,0)}</td><td>${w.toFixed(1)}% ${barSpan(w,50,'#ffb000')}</td><td class="dn">${usd(riskAmt,0)}</td></tr>`;
+  }).join("");
+  const secRows=Object.entries(PORT.secW).sort((a,b)=>b[1]-a[1]).map(([s,v])=>`<tr class="row"><td style="text-align:left">${esc(s)}</td><td>${(v/PORT.mv*100).toFixed(1)}% ${barSpan(v/PORT.mv*100,60,'#4fd4ff')}</td><td>${usd(v,0)}</td></tr>`).join("");
+  const techW=Object.entries(PORT.secW).filter(([s])=>/Tech|Comm/.test(s)).reduce((a,[,v])=>a+v,0)/PORT.mv*100;
+
+  /* === [V33] 비중 도넛 — 평가액 기준, 화면 최상단 ===
+     블로터 표의 비중 칸은 숫자를 읽어야 파악되지만, 도넛은 '한 종목이 유난히 크다'가
+     한눈에 들어온다. 아기 보면서 훑는 용도라 이쪽이 먼저 와야 한다. */
+  const dItems=PORT.h.slice().sort((a,b)=>b.mv-a.mv)
+    .map((o,i)=>({k:o.tk,v:o.mv,c:DONUT_COLORS[i%DONUT_COLORS.length],o:o}));
+  const donutBlock = (PORT.mv>0&&dItems.length)
+   ? `<div class="panel">${ph("POSITION WEIGHTS",`${dItems.length}종목 · 최대비중 ${(dItems[0].v/PORT.mv*100).toFixed(1)}% ${esc(dItems[0].k)}`)}<div class="pb">
+       <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+         <div style="position:relative;flex:0 0 auto">
+           ${donutSvg(dItems,190,30)}
+           <div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+             <div class="kpi" style="font-size:16px">${usd(PORT.mv,0)}</div>
+             <div class="muted mono-sm">평가액</div>
+             <div class="${cls(PORT.ret)} b mono-sm">${pct(PORT.ret)}</div>
+           </div>
+         </div>
+         <table style="flex:1 1 300px;min-width:280px">
+           <tr><th style="text-align:left">종목</th><th>비중</th><th>평가액</th><th>손익%</th></tr>
+           ${dItems.map(it=>`<tr class="row">
+             <td style="text-align:left"><span class="dot" style="background:${it.c}"></span>${symLink(it.k)}</td>
+             <td class="b">${(it.v/PORT.mv*100).toFixed(1)}%</td>
+             <td>${usd(it.v,0)}</td>
+             <td class="${cls(it.o.pnl)} b">${pct(it.o.pnl)}</td></tr>`).join("")}
+         </table>
+       </div>
+     </div></div>`
+   : `<div class="panel">${ph("POSITION WEIGHTS")}<div class="pb"><div class="muted mono-sm">보유 포지션이 없습니다 (KIS 잔고 미수신).</div></div></div>`;
+
+  return vHeader("PORT")+donutBlock+
+   `<div class="grid g3">
+     <div class="panel">${ph("미실현손익")}<div class="pb"><div class="${cls(PORT.upl)} kpi">${pct(PORT.ret)}</div><div class="muted">${usd(PORT.upl,0)}</div></div></div>
+     <div class="panel">${ph("평가액")}<div class="pb"><div class="kpi">${usd(PORT.mv,0)}</div><div class="muted">원가 ${usd(PORT.cost,0)}</div></div></div>
+     <div class="panel">${ph("집중도")}<div class="pb"><div class="kpi ${techW>70?'dn':''}">${techW.toFixed(0)}%</div><div class="muted">Tech+Comm — 사실상 AI캐펙스 단일 베팅</div></div></div>
+   </div>
+   <div class="panel">${ph("POSITION BLOTTER","수량·손익·비중·포지션리스크(손절까지 손실액)")}<div class="pb"><table>
+     <tr><th>티커</th><th>수량</th><th>평단</th><th>현재가</th><th>손익%</th><th>미실현$</th><th>평가액</th><th>비중</th><th>손절리스크$</th></tr>${rows}
+     <tr><td class="b">합계</td><td></td><td></td><td></td><td class="${cls(PORT.ret)} b">${pct(PORT.ret)}</td><td class="${cls(PORT.upl)} b">${usd(PORT.upl,0)}</td><td class="b">${usd(PORT.mv,0)}</td><td>100%</td><td></td></tr></table>
+     <div class="muted mono-sm" style="margin-top:6px">※ 수량은 데모값(HOLD.qty 편집). 손익%·평단은 실측. 시트 Settings 보유상태 FALSE↔평단 불일치는 정리 필요.</div></div></div>
+   <div class="panel">${ph("SECTOR WEIGHTS")}<div class="pb"><table><tr><th style="text-align:left">섹터</th><th>비중</th><th>평가액</th></tr>${secRows}</table></div></div>`;
+}
+
+function vRegime(){
+  const sec=SX.slice().sort((a,b)=>b.rs-a.rs).map(s=>`<tr class="row"><td style="text-align:left">${s.tk} <span class="muted">${esc(s.name)}</span></td><td><span class="tag ${s.grp==='def'?'':'cyan'}" style="${s.grp==='def'?'color:var(--violet)':''}">${s.grp==='def'?'방어':'경기'}</span></td><td class="${cls(s.rs)} b">${fmt(s.rs)}</td><td>${barSpan(s.rs,12,s.rs>0?'#33d17a':'#ff5b5b')}</td><td class="${s.ud>1?'up':'muted'}">${fmt(s.ud)}</td></tr>`).join("");
+  return vHeader("REGIME")+
+   `<div class="grid g3">
+     <div class="panel">${ph("REGIME LIGHT")}<div class="pb"><div><span class="dot" style="background:var(--${REG.light[1]})"></span><span class="${REG.light[1]} kpi">${REG.light[0]}</span></div><div class="muted mono-sm">브레드스+스프레드+VIX 종합 score ${REG.score}</div></div></div>
+     <div class="panel">${ph("VIX")}<div class="pb"><div class="warn kpi">${CONFIG.VIX}</div><div class="muted">${REG.vixBand} · ${REG.vixPct.toFixed(0)}%ile(52주)</div><div style="margin-top:4px">${spark(VIXH,150,26,'#ffd23f')}</div></div></div>
+     <div class="panel">${ph("경기민감 − 방어")}<div class="pb"><div class="${cls(REG.spread)} kpi">${fmt(REG.spread)}</div><div class="muted">경기 ${fmt(REG.cyc)} vs 방어 ${fmt(REG.def)}</div><div class="mono-sm ${REG.spread<0?'dn':'up'}">${REG.spread<0?'방어 우위 → 리스크오프 로테이션':'경기 우위 → 리스크온'}</div></div></div>
+   </div>
+   ${LIVE_INDEX&&LIVE_INDEX.px&&LIVE_INDEX.e1?`<div class="panel">${ph("S&P 500 VALUATION · 자동계산","지수 ${usd(LIVE_INDEX.px,0)} ÷ FactSet 상향식 CY EPS")}<div class="pb"><table>
+     <tr><th></th><th>EPS(FactSet)</th><th>PER</th></tr>
+     ${LIVE_INDEX.e0?`<tr class="row"><td class="muted">당해</td><td>${fmt(LIVE_INDEX.e0)}</td><td class="b">${(LIVE_INDEX.px/LIVE_INDEX.e0).toFixed(1)}배</td></tr>`:""}
+     <tr class="row"><td class="muted">선행(내년)</td><td>${fmt(LIVE_INDEX.e1)}</td><td class="amber b">${(LIVE_INDEX.px/LIVE_INDEX.e1).toFixed(1)}배</td></tr>
+     ${LIVE_INDEX.e2?`<tr class="row"><td class="muted">내후년</td><td>${fmt(LIVE_INDEX.e2)}</td><td>${(LIVE_INDEX.px/LIVE_INDEX.e2).toFixed(1)}배</td></tr>`:""}
+   </table><div class="muted mono-sm" style="margin-top:4px">역사 참고: 선행 PER 10년 평균 ≈18배 · 닷컴 고점 ≈24배. KOSPI 밴드 방법론의 S&P 버전.</div></div></div>`:""}
+   <div class="panel">${ph("SECTOR BREADTH","RS>0 "+REG.brdRS+"/11 · U/D>1 "+REG.brdUD+"/11")}<div class="pb"><table>
+     <tr><th style="text-align:left">섹터</th><th>구분</th><th>RS</th><th></th><th>U/D</th></tr>${sec}</table></div></div>`;
+}
+
+/* === [V40] 섹터 로테이션 보드 (RRG 대체) ===
+   읽는 순서: ① 맨 위 한 줄(이번 주 바뀐 것) → ② 노란 줄 섹터의 13주 흐름 → ③ 아래 RRG로 위치 감각.
+   숫자는 전부 SX(rebuildAll)에서 온다 — 여기서는 그리기만 한다. */
+const SEC_KO={XLK:"기술",XLF:"금융",XLV:"헬스케어",XLY:"경기소비재",XLC:"커뮤니케이션",XLI:"산업재",
+              XLP:"필수소비재",XLE:"에너지",XLU:"유틸리티",XLRE:"부동산",XLB:"소재"};
+const RRG_COLS=13;     // 보드에 보여줄 주 수
+const RRG_TAIL=4;      // 보조 RRG 꼬리 길이(주)
+function rrgVerdict(s,withRank){
+  const q=s.q||[], n=q.length, cur=s.quad, p1=n>=2?q[n-2]:null, p4=n>=5?q[n-5]:null;
+  if(!cur)return "<span class='muted'>데이터 부족 (5주 미만)</span>";
+  let t;
+  if(cur==="주도")      t=(p4&&p4!=="주도")?`주도 진입 (4주 전 ${p4})`:`주도 ${s.streak}주째`;
+  else if(cur==="약화") t=(p1==="주도")?"이번 주 주도에서 꺾임":`강하지만 힘 빠지는 중 ${s.streak}주째`;
+  else if(cur==="개선") t=(p1==="소외")?"바닥에서 돌아서는 중 · 관찰 후보":`약하지만 좋아지는 중 ${s.streak}주째`;
+  else                  t=(p4==="주도"||p4==="약화")?`4주 사이 주도권 상실 (${p4}→소외)`:`소외 ${s.streak}주째`;
+  if(withRank&&s._r4&&s._r0&&Math.abs(s._r4-s._r0)>=3)t+=` · 순위 ${s._r4}→${s._r0}`;
+  const tags=[];
+  if(Math.abs(s.rs)<1||(s.mom!=null&&Math.abs(s.mom)<1))tags.push("경계선");
+  if(s.streak===1&&p1&&p1!==cur)tags.push("2주 확인 전");
+  return esc(t)+(tags.length?` <span class="muted">· ${tags.join(" · ")}</span>`:"");
+}
+function rsSpark(arr,w,h,col){
+  if(!arr||arr.length<2)return "";
+  const mn=Math.min(0,...arr),mx=Math.max(0,...arr),rg=(mx-mn)||1,p=2;
+  const X=i=>p+i/(arr.length-1)*(w-2*p), Y=v=>p+(mx-v)/rg*(h-2*p);
+  const pts=arr.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  const i4=arr.length-5;
+  return `<svg width="${w}" height="${h}" style="display:block">
+    <polygon points="${X(0)},${Y(0)} ${pts} ${X(arr.length-1)},${Y(0)}" fill="${col}" fill-opacity="0.13"/>
+    <line x1="${p}" x2="${w-p}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="#4a4a3a" stroke-dasharray="2 2"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.4"/>
+    ${i4>=0?`<circle cx="${X(i4).toFixed(1)}" cy="${Y(arr[i4]).toFixed(1)}" r="1.8" fill="#8a8672"/>`:""}
+    <circle cx="${X(arr.length-1).toFixed(1)}" cy="${Y(arr[arr.length-1]).toFixed(1)}" r="2.6" fill="${col}"/></svg>`;
+}
+function quadStrip(s,cols){
+  const q=s.q||[], n=q.length, from=Math.max(0,n-cols);
+  let h="";
+  for(let k=0;k<cols-(n-from);k++)h+=`<i class="na"></i>`;
+  for(let i=from;i<n;i++){const x=q[i];
+    h+=x?`<i style="background:${QUAD[x]}${i<n-1?";opacity:.8":""}" title="${s._rsD?s._rsD[i]:""} ${x}">${x[0]}</i>`:`<i class="na"></i>`;}
+  return `<span class="qs">${h}</span>`;
+}
+function rrgMini(list){
+  const W=520,H=400,m={l:44,r:14,t:14,b:34};
+  const tr=list.map(s=>{const r=s._rs,n=r.length,pts=[];
+    for(let i=Math.max(4,n-1-RRG_TAIL);i<n;i++)pts.push([r[i],r[i]-r[i-4]]);return {s,pts};}).filter(o=>o.pts.length);
+  if(!tr.length)return "<div class='muted'>5주 이상 쌓이면 표시됩니다.</div>";
+  const ax=[],ay=[];tr.forEach(o=>o.pts.forEach(p=>{ax.push(Math.abs(p[0]));ay.push(Math.abs(p[1]));}));
+  const XM=Math.ceil((Math.max(...ax)+1)/5)*5, YM=Math.ceil((Math.max(...ay)+1)/5)*5;
+  const X=v=>m.l+(v+XM)/(2*XM)*(W-m.l-m.r), Y=v=>m.t+(YM-v)/(2*YM)*(H-m.t-m.b);
+  const xl=X(-XM),xr=X(XM),yt=Y(YM),yb=Y(-YM),x0=X(0),y0=Y(0);
+  let g="";
+  [["주도",x0,yt,xr-x0,y0-yt],["약화",x0,y0,xr-x0,yb-y0],["소외",xl,y0,x0-xl,yb-y0],["개선",xl,yt,x0-xl,y0-yt]]
+    .forEach(a=>g+=`<rect x="${a[1]}" y="${a[2]}" width="${a[3]}" height="${a[4]}" fill="${QUAD[a[0]]}" fill-opacity="0.07"/>`);
+  for(let v=-XM;v<=XM;v+=5)g+=`<line x1="${X(v)}" x2="${X(v)}" y1="${yt}" y2="${yb}" stroke="#1d1d16"/><text x="${X(v)}" y="${yb+13}" fill="#7d7d68" font-size="9" text-anchor="middle">${v>0?"+"+v:v}</text>`;
+  for(let v=-YM;v<=YM;v+=5)g+=`<line x1="${xl}" x2="${xr}" y1="${Y(v)}" y2="${Y(v)}" stroke="#1d1d16"/><text x="${xl-5}" y="${Y(v)+3}" fill="#7d7d68" font-size="9" text-anchor="end">${v>0?"+"+v:v}</text>`;
+  g+=`<line x1="${x0}" x2="${x0}" y1="${yt}" y2="${yb}" stroke="#55553f"/><line x1="${xl}" x2="${xr}" y1="${y0}" y2="${y0}" stroke="#55553f"/>`;
+  g+=`<rect x="${X(-1)}" y="${Y(1)}" width="${X(1)-X(-1)}" height="${Y(-1)-Y(1)}" fill="none" stroke="#8a8672" stroke-dasharray="2 2"/>`;
+  [["주도",xr-6,yt+14,"end"],["약화",xr-6,yb-8,"end"],["소외",xl+6,yb-8,"start"],["개선",xl+6,yt+14,"start"]]
+    .forEach(c=>g+=`<text x="${c[1]}" y="${c[2]}" fill="${QUAD[c[0]]}" font-size="12" font-weight="700" text-anchor="${c[3]}">${c[0]}</text>`);
+  g+=`<text x="${(xl+xr)/2}" y="${H-4}" fill="#7d7d68" font-size="9.5" text-anchor="middle">← 시장보다 약함 · RS(%p) · 시장보다 강함 →</text>`;
+  g+=`<text x="10" y="${(yt+yb)/2}" fill="#7d7d68" font-size="9.5" text-anchor="middle" transform="rotate(-90 10 ${(yt+yb)/2})">← 나빠지는 중 · 4주 변화(%p) · 좋아지는 중 →</text>`;
+  const heads=[];
+  tr.forEach(({s,pts})=>{
+    const col=QUAD[s.quad]||"#e9e9e4", n=s.q.length, changed=n>=2&&s.q[n-2]&&s.q[n-2]!==s.quad;
+    const dim=!changed&&s.quad==="소외";
+    for(let i=1;i<pts.length;i++){const op=(0.25+0.6*i/(pts.length-1))*(dim?0.5:1);
+      g+=`<line x1="${X(pts[i-1][0]).toFixed(1)}" y1="${Y(pts[i-1][1]).toFixed(1)}" x2="${X(pts[i][0]).toFixed(1)}" y2="${Y(pts[i][1]).toFixed(1)}" stroke="${col}" stroke-opacity="${op.toFixed(2)}" stroke-width="${dim?1.1:1.7}" stroke-linecap="round"/>`;}
+    const h=pts[pts.length-1];heads.push({s,x:X(h[0]),y:Y(h[1]),col:dim?"#a39d86":col,fill:col,changed,dim});
+  });
+  heads.forEach(h=>g+=`<circle cx="${h.x.toFixed(1)}" cy="${h.y.toFixed(1)}" r="5" fill="${h.fill}" fill-opacity="${h.dim?0.55:1}" stroke="${h.changed?"#ffffff":"#000"}" stroke-width="${h.changed?1.8:1.2}"/>`);
+  // 라벨: 다른 라벨·점과 겹치지 않는 자리를 차례로 시도
+  const placed=[],dotR=heads.map(h=>({x:h.x-6,y:h.y-6,w:12,h:12}));
+  const hit=b=>placed.concat(dotR).some(p=>b.x<p.x+p.w&&b.x+b.w>p.x&&b.y<p.y+p.h&&b.y+b.h>p.y)||b.x<xl||b.x+b.w>xr||b.y<yt||b.y+b.h>yb;
+  heads.slice().sort((a,b)=>a.x-b.x).forEach(h=>{
+    const w=h.s.tk.length*6.3+2,hh=12,gp=8,c=[];
+    [[gp,-hh/2],[-gp-w,-hh/2],[-w/2,-gp-hh],[-w/2,gp],[gp,-hh-3],[gp,3],[-gp-w,-hh-3],[-gp-w,3]].forEach(o=>c.push({x:h.x+o[0],y:h.y+o[1],w,h:hh,lead:false}));
+    [20,32,44,56].forEach(r=>[[r,0],[-r-w,0],[r,-r*.6],[r,r*.6],[-r-w,-r*.6],[-r-w,r*.6],[-w/2,-r-hh],[-w/2,r]].forEach(o=>c.push({x:h.x+o[0],y:h.y+o[1]-hh/2,w,h:hh,lead:true})));
+    const b=c.find(x=>!hit(x))||c[0]; placed.push(b);
+    if(b.lead){const cx=Math.max(b.x,Math.min(h.x,b.x+b.w)),cy=Math.max(b.y,Math.min(h.y,b.y+b.h));
+      g+=`<line x1="${h.x.toFixed(1)}" y1="${h.y.toFixed(1)}" x2="${cx.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${h.col}" stroke-opacity=".55" stroke-width=".8"/>`;}
+    g+=`<text x="${(b.x+1).toFixed(1)}" y="${(b.y+hh-2.5).toFixed(1)}" fill="${h.col}" font-size="10.5" font-weight="${h.changed?800:600}">${h.s.tk}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto;display:block;margin:0 auto">${g}</svg>`;
+}
+function vRRG(){
+  const list=SX.slice().sort((a,b)=>(a._r0||99)-(b._r0||99));
+  const realN=SX.filter(s=>s.rsReal).length;
+  const nq=s=>s.q?s.q.length:0;
+  const trans=list.filter(s=>nq(s)>=2&&s.q[nq(s)-2]&&s.quad&&s.q[nq(s)-2]!==s.quad);
+  const conf=list.filter(s=>nq(s)>=3&&s.quad&&s.q[nq(s)-2]===s.quad&&s.q[nq(s)-3]&&s.q[nq(s)-3]!==s.quad);
+  const cnt={"주도":[],"약화":[],"개선":[],"소외":[]}; list.forEach(s=>{if(s.quad)cnt[s.quad].push(s.tk);});
+  const mv=list.filter(s=>s._r0&&s._r4).map(s=>[s,s._r4-s._r0]);
+  const up=mv.slice().sort((a,b)=>b[1]-a[1])[0], dn=mv.slice().sort((a,b)=>a[1]-b[1])[0];
+  const qTxt=(s,a,b)=>`<span class="amber b">${s.tk}</span> <span style="color:${QUAD[a]}">${a}</span>→<span style="color:${QUAD[b]}">${b}</span>`;
+  const chips=["주도","약화","개선","소외"].map(k=>`<span style="margin-right:12px"><span class="dot" style="background:${QUAD[k]}"></span>${k} <b>${cnt[k].length}</b>${cnt[k].length&&cnt[k].length<=3?` <span class="muted">(${cnt[k].join(", ")})</span>`:""}</span>`).join("");
+  const head=`<div class="rrghead">
+     <div><span class="amber b">이번 주 새 전이 ${trans.length}건</span>${trans.length?": "+trans.map(s=>qTxt(s,s.q[nq(s)-2],s.quad)).join(", ")+" <span class='muted'>(2주 확인 전)</span>":" <span class='muted'>— 칸이 바뀐 섹터 없음</span>"}</div>
+     <div><span class="b">2주 연속 확인된 전이</span> ${conf.length?conf.map(s=>qTxt(s,s.q[nq(s)-3],s.quad)).join(", "):"<span class='muted'>없음</span>"}</div>
+     <div>${chips}${up&&up[1]>0?`<span class="muted">4주 순위 최대 상승 </span><span class="up">${up[0].tk} ${up[0]._r4}→${up[0]._r0}</span>`:""}${dn&&dn[1]<0?` <span class="muted">· 최대 하락 </span><span class="dn">${dn[0].tk} ${dn[0]._r4}→${dn[0]._r0}</span>`:""}</div>
+   </div>`;
+  const ref=list.find(s=>s._rsD&&s._rsD.length)||null;
+  let dh="";
+  if(ref){const d=ref._rsD,n=d.length,from=Math.max(4,n-RRG_COLS);   // 사분면은 5번째 주부터 계산됨
+    dh=`${d[from].slice(5)} → ${d[n-1].slice(5)}${d[n-1]===String(CONFIG.ASOF).slice(0,10)?" (대시보드)":""}`;}
+  const rows=list.map(s=>{
+    const n=nq(s), hl=n>=2&&s.q[n-2]&&s.quad&&s.q[n-2]!==s.quad, col=QUAD[s.quad]||"#7d7d68";
+    const dr=(s._r4&&s._r0)?s._r4-s._r0:0;
+    return `<tr class="row${hl?" hl":""}"><td style="text-align:left"><span class="amber b">${s.tk}</span> <span class="muted">${esc(SEC_KO[s.tk]||s.name)}</span></td>
+      <td style="text-align:left">${s.stage?stageChip(s.stage):"<span class='muted'>—</span>"}</td>
+      <td style="text-align:left">${quadStrip(s,RRG_COLS)}</td>
+      <td>${rsSpark(s._rs.slice(-(RRG_COLS+4)),96,22,col)}</td>
+      <td class="${cls(s.rs)} b">${fmt(s.rs,1)}</td>
+      <td class="${s.mom==null?"muted":cls(s.mom)}">${s.mom==null?"—":(s.mom>0?"+":"")+fmt(s.mom,1)}</td>
+      <td class="${s.ud>=1?"up":"muted"}">${fmt(s.ud)}</td>
+      <td class="${s.dd==null?"muted":s.dd<=-10?"dn":"muted"}">${s.dd==null?"—":pct(s.dd)}</td>
+      <td>${s._r4?s._r4+"→":""}${s._r0||"—"} ${dr?`<span class="${dr>0?"up":"dn"}">${dr>0?"▲"+dr:"▼"+(-dr)}</span>`:""}</td>
+      <td style="text-align:left;white-space:normal;min-width:190px">${rrgVerdict(s)}</td></tr>`;}).join("");
+  const cards=list.map(s=>{const col=QUAD[s.quad]||"#7d7d68";
+    return `<div class="rcard"><div class="rtop"><span><span class="amber b">${s.tk}</span> <span class="muted">${esc(SEC_KO[s.tk]||s.name)}</span></span>${s.quad?`<span class="rq" style="background:${col}">${s.quad}</span>`:""}</div>
+      ${rsSpark(s._rs.slice(-(RRG_COLS+4)),240,34,col).replace('style="display:block"','style="display:block;width:100%;height:auto" viewBox="0 0 240 34" preserveAspectRatio="none"')}
+      <div class="rnum"><span><span class="muted">RS</span> <span class="${cls(s.rs)}">${fmt(s.rs,1)}</span></span><span><span class="muted">4주</span> <span class="${s.mom==null?"muted":cls(s.mom)}">${s.mom==null?"—":(s.mom>0?"+":"")+fmt(s.mom,1)}</span></span><span><span class="muted">순위</span> ${s._r0||"—"}</span>${s.stage?`<span>${stageChip(s.stage)}</span>`:""}</div>
+      <div>${quadStrip(s,RRG_COLS)}</div>
+      <div class="rv">${rrgVerdict(s,true)}</div></div>`;}).join("");
+  const warn=realN<SX.length?`<div class="banner">${realN?`실측 ${realN}/${SX.length}`:"SIM"} — Database RS 히스토리가 없는 섹터는 시드 데이터입니다.</div>`:"";
+  return vHeader("RRG",` · 기준 ${esc(String(CONFIG.ASOF||""))}`)+warn+
+   `<div class="panel">${ph("SECTOR ROTATION BOARD",`사분면 = RS × 4주 변화 · 주 1점(토요일) + 대시보드 머리점`)}
+     ${head}
+     <div class="pb rrgtable" style="overflow-x:auto"><table style="min-width:900px">
+       <tr><th style="text-align:left">섹터</th><th style="text-align:left">스테이지</th><th style="text-align:left">${RRG_COLS}주 흐름 ${dh?`<span class="muted">${dh}</span>`:""}</th><th>RS 추이</th><th>RS</th><th>4주 변화</th><th>U/D</th><th>고점대비</th><th>순위 4주전→</th><th style="text-align:left">판정</th></tr>
+       ${rows}</table></div>
+     <div class="pb rrgcards">${cards}</div>
+     <div class="pb muted mono-sm">노란 줄 = 이번 주 칸이 바뀐 섹터 · 흐름 칸 글자: 주(주도) 약(약화) 소(소외) 개(개선) · 경계선 = RS나 4주 변화가 ±1%p 안이라 칸 이름이 쉽게 뒤집힘 · 판정은 규칙으로 만든 문장이며 매매 권고가 아닙니다.</div>
+   </div>
+   <div class="grid g2">
+     <div class="panel">${ph("ROTATION MAP",`최근 ${RRG_TAIL}주 궤적 · 흰 테두리 = 이번 주 전이`)}<div class="pb">${rrgMini(list)}</div></div>
+     <div class="panel">${ph("읽는 법")}<div class="pb" style="font-family:system-ui,sans-serif;line-height:1.6">
+       ${["주도","약화","소외","개선"].map(k=>`<div><span class="dot" style="background:${QUAD[k]}"></span><b style="color:${QUAD[k]}">${k}</b> <span class="muted">${QUAD_TXT[k]}</span></div>`).join("")}
+       <div class="sep"></div>
+       <div class="mono-sm">RS = 50일 수익률 − S&amp;P 500 (%p) · 4주 변화 = 지금 RS − 4주 전 RS.</div>
+       <div class="mono-sm">교과서적 순환은 개선 → 주도 → 약화 → 소외 순서(RRG 시계방향)입니다. 흐름 칸의 색이 이 순서로 바뀌는지 보면 됩니다.</div>
+       <div class="mono-sm">전이는 한 주만 보고 판단하지 말고 <b>2주 연속</b>일 때 확인된 것으로 봅니다. 50일 RS의 4주 변화는 주마다 부호가 자주 바뀝니다.</div>
+       <div class="mono-sm muted">U/D는 칸을 나누는 데 쓰지 않습니다. 1 이상이면 거래량이 방향을 받쳐준다는 보조 확인입니다.</div>
+     </div></div>
+   </div>`;
+}
+
+/* === [V22] EPS 리비전 브레드스 — Database 주간 스냅샷 기반 실측 === */
+const REV_EPS_TH=0.05;   // ±0.05% 이내는 '보합'으로 (반올림 노이즈 제외)
+
+/* === [V30] 자체 Database 브레드스를 '정식 지표'로 쓰기 위한 두 가지 가드 ===
+   이 지표는 S&P 500 전체가 아니라 '내가 추적하는 종목'의 EPS 리비전을 집계한다.
+   표본이 얇다는 사실을 숨기면 지표가 아니라 착시가 되므로, 두 가지를 명시한다.
+
+   ① 섹터별 표본 수(N) 하한 — N이 이 값 미만인 섹터는 평균을 숨기고 N/A 처리.
+      추적 종목 31개를 11개 GICS 섹터로 쪼개면 섹터당 1~2개가 다수다.
+      그 상태의 '섹터 평균'은 개별 종목 한 개의 EPS 변화를 섹터 신호로 오독하게 만든다.
+   ② 스냅샷 성숙도 — Database append가 주 1회이므로 4주 리비전에는 5주치가 필요하다.
+      그 전까지는 IMMATURE 배지를 띄워 '아직 판단 근거로 쓰지 말 것'을 표시한다.
+   ※ 둘 다 '시간이 해결하는' 문제라 지표 자체를 내리지 않고 라벨만 붙인다. */
+const REV_SEC_MIN_N=3;   // 섹터 평균을 표시할 최소 종목 수
+const REV_MATURE_N=5;    // 4주 리비전이 성립하는 최소 주간 스냅샷 수
+
+/* === [V38] 섹터 EPS (SectorEPS 탭 수동입력) ===
+   S&P DJI 자동수집은 GitHub Actions IP 차단으로 불가능하고, Drive 반자동도
+   결국 매월 사람 손이 필요하다. 그래서 지수 EPS와 같은 방식으로 일원화했다.
+   11개 섹터를 다 채울 필요는 없다 — 채운 행만 표시된다.
+   정렬은 '가장 가까운 미래 연도의 성장률' 내림차순: 어느 섹터의 이익이
+   빨리 늘고 있는지가 한눈에 보이도록. 값이 없는 섹터는 뒤로 밀린다. */
+function vSectorEps(){
+  const S=SECTOR_EPS;
+  if(!S||!S.rows||!S.rows.length){
+    return `<div class="panel">${ph("SECTOR EPS","수동입력 · 미등록")}<div class="pb">
+      <div class="muted">시트에 <b>SectorEPS</b> 탭을 만들고 아래 형식으로 입력하면 표시됩니다.</div>
+      <div class="sep"></div>
+      <div class="mono-sm muted">A 섹터 · B~D 연도별 EPS(헤더에 2026 / 2027 / 2028) · E 갱신일 · F 메모</div>
+      <div class="mono-sm muted">관심 섹터만 채워도 됩니다. 빈 행은 무시합니다.</div>
+    </div></div>`;
+  }
+  const gi=S.rows[0].g.length?0:-1;   // 첫 성장률 컬럼 기준으로 정렬
+  const rows=S.rows.slice().sort((a,b)=>{
+    const av=(gi>=0&&a.g[gi]!=null)?a.g[gi]:-1e9;
+    const bv=(gi>=0&&b.g[gi]!=null)?b.g[gi]:-1e9;
+    return bv-av;
+  }).map(r=>{
+    const es=r.e.map(v=>`<td>${v==null?"<span class='muted'>—</span>":fmt(v,2)}</td>`).join("");
+    const gs=r.g.map(v=>`<td class="${v==null?'muted':cls(v)}">${v==null?"—":pct(v,1)}</td>`).join("");
+    return `<tr class="row"><td style="text-align:left" class="b">${esc(r.sec)}</td>${es}${gs}
+      <td class="muted mono-sm">${esc(r.upd||"")}</td></tr>`;
+  }).join("");
+  const yh=S.years.map(y=>`<th>${esc(y)}</th>`).join("");
+  const gh=S.years.slice(1).map((y,i)=>`<th>${esc(S.years[i])}→${esc(y)}</th>`).join("");
+  return `<div class="panel">${ph("SECTOR EPS","수동입력 · 성장률 내림차순")}<div class="pb"><table>
+    <tr><th style="text-align:left">섹터</th>${yh}${gh}<th>갱신</th></tr>${rows}</table>
+    <div class="muted mono-sm" style="margin-top:6px">최종 갱신 ${esc(S.asof||"—")} · 월 1회 갱신 권장. 이 표는 자체 Database 기반 리비전 브레드스와 별개 지표입니다.</div>
+  </div></div>`;
+}
+
+function vRev(){
+  const cov=U.filter(o=>o.wow!=null&&isFinite(o.wow));
+  const real=cov.filter(o=>o.epsReal);
+  const up=cov.filter(o=>o.wow>REV_EPS_TH), dn=cov.filter(o=>o.wow<-REV_EPS_TH);
+  const flat=cov.length-up.length-dn.length;
+  const net=cov.length?((up.length-dn.length)/cov.length*100):0;
+  const diff=cov.length?(up.length/cov.length*100):0;
+
+  const c4=cov.filter(o=>o.rev4!=null&&isFinite(o.rev4));
+  const up4=c4.filter(o=>o.rev4>REV_EPS_TH).length, dn4=c4.filter(o=>o.rev4<-REV_EPS_TH).length;
+  const net4=c4.length?((up4-dn4)/c4.length*100):0;
+
+  // 확산지수 게이지 (0~100%, 50이 중립)
+  const gauge=`<div style="position:relative;height:14px;background:#161b22;border:1px solid var(--bd);margin:6px 0">
+     <div style="position:absolute;left:0;top:0;bottom:0;width:${diff.toFixed(1)}%;background:${diff>=50?'var(--up)':'var(--dn)'};opacity:.55"></div>
+     <div style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--fg)"></div>
+     <div style="position:absolute;left:4px;top:-1px;font-size:10px" class="b">${diff.toFixed(0)}%</div></div>`;
+
+  // === [V30] 성숙도 판정: 실측 스냅샷이 몇 주치 쌓였는가 ===
+  const snapN=real.length?Math.max(...real.map(o=>o.epsN||0)):0;
+  const matBadge = real.length===0
+    ? `<span class="tag dn">SIM · 실측 0주</span>`
+    : (snapN>=REV_MATURE_N
+        ? `<span class="tag up">실측 ${snapN}주</span>`
+        : `<span class="tag warn">IMMATURE · 실측 ${snapN}/${REV_MATURE_N}주</span>`);
+
+  // === [V30] 섹터별 평균 리비전 — 표본 N이 얇은 섹터는 값을 감추고 N/A ===
+  const bySec={};
+  cov.forEach(o=>{(bySec[o.sec]=bySec[o.sec]||[]).push(o.wow);});
+  const secAll=Object.entries(bySec).map(([s,a])=>[s,avg(a),a.length]);
+  const secOK=secAll.filter(r=>r[2]>=REV_SEC_MIN_N).sort((a,b)=>b[1]-a[1]);
+  const secNA=secAll.filter(r=>r[2]<REV_SEC_MIN_N).sort((a,b)=>b[2]-a[2]);
+  const secRows=
+    secOK.map(([s,m,n])=>
+      `<tr class="row"><td style="text-align:left">${esc(s)}</td><td class="${cls(m)} b">${pct(m,2)}</td><td class="b">${n}</td><td>${barSpan(m,3,m>=0?'#33d17a':'#ff5b5b')}</td></tr>`).join("")
+   +secNA.map(([s,m,n])=>
+      `<tr class="row"><td style="text-align:left" class="muted">${esc(s)}</td><td class="muted">N/A</td><td class="muted">${n}</td><td class="muted mono-sm">표본 &lt;${REV_SEC_MIN_N}</td></tr>`).join("");
+
+  // 종목별 리비전 (실측 우선 정렬)
+  const rows=cov.slice().sort((a,b)=>(b.rev4??b.wow??-999)-(a.rev4??a.wow??-999)).map(o=>{
+    const tc=o.nLastTC;
+    const r4=o.rev4!=null&&isFinite(o.rev4)?`<span class="${cls(o.rev4)} b">${pct(o.rev4)}</span>`:"<span class='muted'>—</span>";
+    const src=o.epsReal?`<span class="tag" style="color:var(--up)">실 ${o.epsN}주</span>`:"<span class='tag muted'>SIM</span>";
+    return `<tr class="row">${symTd(o.tk)}<td>${o.stage?stageChip(o.stage):"<span class='muted'>—</span>"}</td><td>${fmt(o.e27)}</td><td class="${cls(o.wow)}">${pct(o.wow,2)}</td><td>${r4}</td><td>${spark(o.epsSeries,110,24,(o.rev4??o.wow)>=0?'#33d17a':'#ff5b5b')}</td><td>${src}</td><td class="${tc.includes('-')?'dn':tc?'up':''}">${esc(tc)||"—"}</td></tr>`;
+  }).join("");
+
+  const kpi=(l,v,c)=>`<div><span class="muted">${l}</span> <span class="${c} kpi" style="font-size:18px">${v}</span></div>`;
+  return vHeader("REV")+
+   `<div class="grid g3">
+     <div class="panel">${ph("REVISION BREADTH · WoW","상향 종목 비중(확산지수) · 50%가 중립")}<div class="pb">
+        ${kpi("순브레드스",(net>=0?"+":"")+net.toFixed(0)+"%",net>=0?"up":"dn")}
+        ${gauge}
+        <div><span class="up b">▲ ${up.length}</span> · <span class="muted">보합 ${flat}</span> · <span class="dn b">▼ ${dn.length}</span> <span class="muted">/ ${cov.length}종목</span></div>
+     </div></div>
+     <div class="panel">${ph("REVISION BREADTH · 4주",matBadge)}<div class="pb">
+        ${kpi("순브레드스",(net4>=0?"+":"")+net4.toFixed(0)+"%",net4>=0?"up":"dn")}
+        <div class="sep"></div>
+        <div><span class="up b">▲ ${up4}</span> · <span class="dn b">▼ ${dn4}</span> <span class="muted">/ ${c4.length}종목</span></div>
+        <div class="muted mono-sm">4주 히스토리 보유 종목만 집계</div>
+     </div></div>
+     <div class="panel">${ph("데이터 커버리지","실측 vs 시드")}<div class="pb">
+        <div>실측(Database) <span class="up b">${real.length}</span> / 시드 <span class="muted b">${cov.length-real.length}</span></div>
+        <div class="sep"></div>
+        <div class="muted mono-sm">${real.length?`Database 주간 스냅샷에서 선행 EPS 시계열을 읽어 계산. 스냅샷이 쌓일수록 4주 지표 커버리지가 넓어집니다.`:`아직 실측 히스토리 없음 — Database에 주간 스냅샷이 2회 이상 쌓이면 자동 전환됩니다.`}</div>
+     </div></div>
+   </div>
+   ${vSectorEps()}
+   <div class="grid g2">
+     <div class="panel">${ph("SECTOR BREADTH",matBadge)}<div class="pb"><table>
+       <tr><th style="text-align:left">섹터</th><th>평균 WoW</th><th>N</th><th></th></tr>${secRows||"<tr><td class='muted'>데이터 없음</td></tr>"}</table>
+       <div class="muted mono-sm" style="margin-top:6px">※ 섹터 평균 WoW 리비전. <b>N &lt; ${REV_SEC_MIN_N}인 섹터는 N/A</b> — 종목 1~2개의 EPS 변화는 섹터 신호가 아니라 개별 노이즈입니다.${snapN>=REV_MATURE_N?"":` 스냅샷 ${snapN}/${REV_MATURE_N}주 — 4주 리비전이 성립하기 전이라 방향만 참고하세요.`}</div></div></div>
+     <div class="panel">${ph("해석 가이드")}<div class="pb">
+       <div class="mono-sm">확산지수 <span class="b">&gt;60%</span> — 광범위한 상향, 리스크온 구간</div>
+       <div class="mono-sm">확산지수 <span class="b">40~60%</span> — 혼조, 종목선택 장세</div>
+       <div class="mono-sm">확산지수 <span class="b">&lt;40%</span> — 광범위한 하향, 실적 사이클 둔화 신호</div>
+       <div class="sep"></div>
+       <div class="muted mono-sm">※ 지수 레벨보다 <b>방향의 폭</b>이 사이클 전환을 먼저 알려줍니다. 개별 종목 하향은 노이즈일 수 있으나 브레드스 붕괴는 사이클 신호입니다.</div>
+     </div></div>
+   </div>
+   <div class="panel">${ph("ESTIMATE REVISION MOMENTUM","선행 EPS · 주간(WoW) · 4주 변화")}<div class="pb"><table>
+     <tr><th>티커</th><th>스테이지</th><th>선행 EPS</th><th>WoW</th><th>4주</th><th>추이</th><th>출처</th><th>목표가Δ(뉴스)</th></tr>${rows}</table></div></div>`;
+}
+
+/* === [V23] 테제 카드 + 매매일지·아이디어 (Journal 탭 연동) === */
+const KIND_COL={"테제":"amber","매매일지":"cyan","아이디어":"violet"};
+const ST_COL={"활성":"up","관찰":"warn","검증됨":"cyan","폐기":"muted"};
+let TH_FILTER="";
+const _idSafe=id=>String(id).replace(/[^A-Za-z0-9_-]/g,"");
+
+/* === [V31] 저장 결과를 '추정'하지 않는다 ===
+   기존 코드는 응답 파싱에 실패하면 {ok:true}를 돌려줬다. 배포가 낡아 doPost가 없거나
+   Apps Script가 HTML 에러 페이지를 반환해도 화면엔 "✓ 저장됨"이 떴다는 뜻이다.
+   저장 여부는 시트를 다시 읽어 확인하고(thesisAdd), 여기서는 사실만 돌려준다. */
+async function jPost(payload){
+  /* === [V37] no-cors 전송 ===
+     file:// 에서는 POST 응답도 읽을 수 없다 (tryLive와 같은 이유).
+     mode:"no-cors"는 응답을 opaque로 만들지만 전송 자체는 이뤄지므로,
+     성공 여부는 응답이 아니라 '시트를 다시 읽어 실제로 있는지'로 판정한다.
+     V31이 이미 그렇게 설계돼 있어서(thesisAdd의 엔드투엔드 확인) 여기만
+     바꾸면 나머지는 그대로 맞물린다. res.id는 못 받게 되므로 판정은
+     제목·내용 매칭으로 바뀐다 (thesisAdd 쪽 수정 참조). */
+  payload.key=CONFIG.WRITE_KEY;
+  try{
+    await fetch(CONFIG.LIVE_URL,{method:"POST",mode:"no-cors",body:JSON.stringify(payload)});
+    return {sent:true};
+  }catch(e){
+    return {sent:false,error:"전송 실패 — "+e.message};
+  }
+}
+/* === [V42] 저장 확인 — Journal 탭만 가볍게, 짧은 간격으로 여러 번 ===
+   V41까지는 저장 뒤 '전체' 데이터(텔레그램 인덱스·Database 포함)를 다시 받아 확인했다.
+   저장 직후엔 시트 재계산과 겹쳐 25초 한도를 넘기는 일이 있었고, 그러면 터미널 전체가 SIM으로
+   떨어지고 버튼이 '저장 중…'에서 멈췄다 (2026-09-29 MSFT·AMZN 편출 — 실제 기록은 돼 있었음).
+   → ?mode=journal (Code.gs V42)로 Journal 탭만 읽는다. 구버전 GAS면 전체 페이로드가 오지만
+     거기에도 journal 필드가 있으니 똑같이 동작한다(느릴 뿐). 확인 실패가 LIVE 상태를 건드리지 않는다. */
+async function refreshJournal(timeoutMs){
+  const u=CONFIG.LIVE_URL+(CONFIG.LIVE_URL.indexOf("?")>=0?"&":"?")+"mode=journal";
+  const j=await jsonpGet(u,timeoutMs||30000);
+  if(!j||!Array.isArray(j.journal))throw new Error((j&&j.error)||"journal 응답 없음");
+  JOURNAL=j.journal;
+  if(j.gasVer)LIVE_GAS={ver:j.gasVer,hasPost:!!j.hasPost};
+  return JOURNAL;
+}
+async function confirmJournal(pred,onTry){
+  const waits=[1000,3000,6000];
+  let err="";
+  for(let i=0;i<waits.length;i++){
+    await new Promise(r=>setTimeout(r,waits[i]));
+    if(onTry)onTry(i+1,waits.length);
+    try{await refreshJournal(30000); if(pred())return {ok:true};}
+    catch(e){err=(e&&e.message)||String(e);}
+  }
+  return {ok:false,err};
+}
+function thMsg(html){const m=el("thMsg");if(m)m.innerHTML=html;}
+async function thesisAdd(){
+  if(SAVING)return;                                   // === [V42] 연타로 두 번 저장되는 것 방지
+  if(!LIVE_ON){flashHint("LIVE 연결 필요 — SETUP에서 URL 입력 후 사용 가능");return;}
+  if(!CONFIG.WRITE_KEY){flashHint("일지 저장 키가 없음 — SETUP에서 입력");openSetup();return;}
+  const kind=el("thKind").value, tk=el("thTk").value.trim().toUpperCase();
+  const title=el("thTitle").value.trim(), text=el("thText").value.trim(), fal=el("thFal").value.trim();
+  if(!title&&!text){flashHint("제목 또는 내용을 입력하세요");return;}
+  thDraftSave();                                      // 확인 전까지 이 기기에 보관
+  const before=new Set(JOURNAL.map(x=>String(x.id)));
+  const t200=title.slice(0,200).trim(), x4000=text.slice(0,20000).trim();   // Code.gs V42 한도와 동일
+  const setBtn=(busy)=>{const b=el("thSave");if(!b)return;b.textContent=busy?"저장 중…":"💾 저장";
+    b.style.pointerEvents=busy?"none":"";b.style.opacity=busy?".5":"";};
+  SAVING=true; setBtn(true); thMsg("<span class='muted'>전송 중…</span>");
+  const finish=(html)=>{SAVING=false; setBtn(false); thMsg(html);};
+  try{
+    const res=await jPost({action:"add",kind,tk,title,text,falsify:fal});
+    if(!res.sent){finish(`<span class='dn'>전송 실패 — ${esc(res.error||"네트워크 오류")}. 글은 그대로 있으니 다시 눌러도 됩니다.</span>`);return;}
+    const c=await confirmJournal(
+      ()=>JOURNAL.some(x=>!before.has(String(x.id))&&((t200&&x.title===t200)||(x4000&&x.text===x4000))),
+      (n,m)=>thMsg(`<span class='muted'>전송됨 — 시트 기록 확인 중 (${n}/${m})…</span>`));
+    if(c.ok){
+      SAVING=false;
+      TH_FIELDS.forEach(k=>{const e=el(k); if(e&&k!=="thKind")e.value="";});   // 확인됐으니 폼을 비운다
+      thDraftClear(); render();                       // (render가 빈 폼을 보관 → 초안도 비워진 상태 유지)
+      thMsg("<span class='up'>✓ 저장됨 — Journal 탭 기록을 확인했습니다</span>");
+      flashHint("✓ 저장됨");
+    }else{
+      finish(`<span class='warn'>전송은 됐지만 기록 확인이 안 됐습니다. <b>다시 누르지 말고</b> 잠시 뒤 R(새로고침)로 목록을 확인하세요 — 다시 누르면 같은 글이 두 번 저장될 수 있습니다.`
+        +` 계속 안 보이면 SETUP의 일지 저장 키가 Code.gs의 WRITE_KEY와 같은지 확인하세요.</span>`
+        +(c.err?` <span class='muted'>(${esc(c.err)})</span>`:""));
+    }
+  }catch(err){finish(`<span class='dn'>저장 실패: ${esc(err.message)}</span>`);}
+}
+async function thesisStatus(id,status){
+  if(SAVING)return;
+  if(!LIVE_ON){flashHint("LIVE 연결 필요");return;}
+  SAVING=true;
+  try{
+    const res=await jPost({action:"setstatus",id,status});
+    if(!res.sent){flashHint("실패: "+res.error);return;}
+    flashHint("상태 변경 전송 — 확인 중…");
+    const c=await confirmJournal(()=>{const row=JOURNAL.find(x=>String(x.id)===String(id));return !!row&&row.status===status;});
+    SAVING=false;
+    if(c.ok){render();flashHint("✓ 상태 → "+status);}
+    else flashHint("상태 변경 확인이 늦어짐 — 잠시 뒤 R로 확인하세요");
+  }catch(err){flashHint("실패: "+err.message);}
+  finally{SAVING=false;}
+}
+
+/* === [V42] 작성 중인 일지 보존 ===
+   재렌더(자동 갱신·화면 이동·저장 확인)나 새로고침으로 긴 글이 날아가지 않게, 저장이 '확인'될
+   때까지 이 브라우저에 임시 보관한다. */
+const TH_FIELDS=["thKind","thTk","thTitle","thText","thFal"], TH_DRAFT_KEY="tkstock.thDraft";
+function thDraftSave(){
+  if(!el("thTitle"))return;
+  const d={}; let any=false;
+  TH_FIELDS.forEach(k=>{const e=el(k); if(e){d[k]=e.value; if(k!=="thKind"&&e.value.trim())any=true;}});
+  try{if(any)localStorage.setItem(TH_DRAFT_KEY,JSON.stringify(d)); else localStorage.removeItem(TH_DRAFT_KEY);}catch(e){}
+}
+function thDraftClear(){try{localStorage.removeItem(TH_DRAFT_KEY);}catch(e){}}
+function thDraftRestore(){
+  let d=null; try{d=JSON.parse(localStorage.getItem(TH_DRAFT_KEY)||"null");}catch(e){}
+  if(!d)return;
+  TH_FIELDS.forEach(k=>{const e=el(k); if(e&&d[k]!=null)e.value=d[k];});
+  thAutosize(el("thText")); thAutosize(el("thFal"));   // === [V43]
+  thMsg("<span class='muted'>작성 중이던 글을 불러왔습니다 (저장이 확인되면 비워집니다)</span>");
+}
+document.addEventListener("input",e=>{if(e.target&&TH_FIELDS.includes(e.target.id))thDraftSave();
+  if(e.target&&e.target.classList&&e.target.classList.contains("jin"))thAutosize(e.target);});
+/* === [V43] 입력칸은 쓰는 만큼 늘어난다 (빈 칸이 화면을 다 차지해 저장한 기록이 아래로 밀리던 것 방지)
+   내용칸은 화면 높이의 70%, 반증칸은 50%까지 늘고 그 뒤로는 칸 안에서 스크롤 */
+function thAutosize(t){
+  if(!t)return;
+  const max=Math.round(innerHeight*(t.id==="thFal"?0.5:0.7));
+  t.style.height="auto";
+  const h=t.scrollHeight+2;
+  t.style.height=Math.min(h,max)+"px";
+  t.style.overflowY=h>max?"auto":"hidden";
+}
+document.addEventListener("change",e=>{if(e.target&&e.target.id==="thKind")thDraftSave();});
+
+/* === [V43] 매매일지 서식 보존 렌더러 ===
+   [원인] 시트 Journal 탭에는 줄바꿈·들여쓰기가 그대로 저장돼 있었다(입력·저장은 정상).
+   화면이 esc(j.text)를 일반 <div>/<span>에 넣어서, HTML 기본 규칙(white-space:normal)대로
+   줄바꿈과 연속 공백이 모두 공백 한 칸으로 접혀 한 문단이 됐다.
+   [해결] 원문을 한 줄씩 그린다.
+     · 줄 앞 공백 → 들여쓰기(ch). 줄 안 공백 → 그대로(pre-wrap). 글꼴은 영문1:한글2 고정폭.
+     · □ ㅇ - ① ※ 머리기호 → 매달린 들여쓰기 + 단계별 색 (내용은 한 글자도 바꾸지 않는다)
+     · 공백으로 칸을 맞춘 표(연속 공백 3칸 이상이 2줄 이상) → 줄바꿈 없이 가로 스크롤
+     · 'R#번호'는 리포트 표시, 'J+숫자' 일지 ID는 누르면 그 일지를 연다. */
+const escA=s=>esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const J_W=c=>{const k=c.codePointAt(0);return (k<0x80||k===0xa0)?1:2;};   // 나눔고딕코딩 실측: ASCII·NBSP 1칸, 나머지 2칸
+function jTabs(s){
+  if(s.indexOf("\t")<0)return s;
+  let o="",col=0;
+  for(const ch of s){if(ch==="\t"){const n=4-(col%4);o+=" ".repeat(n);col+=n;}else{o+=ch;col+=J_W(ch);}}
+  return o;
+}
+const J_MARKS=[
+  [/^([□■◆◇▣])([ \u3000]+)/,"jh1"],
+  [/^([ㅇ○◦●])([ \u3000]+)/,"jh2"],
+  [/^([①-⑳]|\(\d{1,2}\)|\d{1,2}[.)]|[가나다라마바사아자차카타파하][.)])([ \u3000]+)/,"jnum"],
+  [/^(※)([ \u3000]*)/,"jnote"],
+  [/^([-–—·•∙▪*>→])([ \u3000]+)/,"jh3"]
+];
+const jFind=id=>JOURNAL.find(x=>String(x.id)===String(id));
+function jInline(s){
+  return esc(s)
+    .replace(/\bR#(\d{3,})/g,'<span class="jref">R#$1</span>')
+    .replace(/\b(J\d{10,})\b/g,(m,id)=>jFind(id)?`<span class="jlink" data-jid="${id}" title="이 일지 열기">${id}</span>`:m);
+}
+function jText(raw,cls){
+  if(cls==="jh2"||cls==="jnum"){                       // "라벨 : 내용" → 라벨만 굵게
+    const k=raw.search(/\s:\s/);
+    if(k>0&&k<=24)return `<span class="jlab">${jInline(raw.slice(0,k))}</span>${jInline(raw.slice(k))}`;
+  }
+  if(cls==="jh3"){                                     // "(UBS) 질문…" → 앞 괄호만 굵게
+    const m=raw.match(/^\([^)]{1,14}\)/);
+    if(m)return `<span class="jlab">${jInline(m[0])}</span>${jInline(raw.slice(m[0].length))}`;
+  }
+  return jInline(raw);
+}
+const J_GAP=/\S[ \u3000]{3,}\S/;                         // 표 후보: 줄 안에 공백 3칸 이상
+function jLine(line){
+  if(!line.trim())return `<div class="jl jb"></div>`;
+  const lead=line.match(/^[ \u3000\u00a0]*/)[0];
+  let ind=0; for(const ch of lead)ind+=(ch==="\u3000"?2:1);
+  let rest=line.slice(lead.length), cls="", mk="";
+  for(const [re,c] of J_MARKS){const m=rest.match(re); if(m){cls=c; mk=m[0]; rest=rest.slice(mk.length); break;}}
+  let mw=0; for(const ch of mk)mw+=J_W(ch);           // 머리기호 폭(칸): □·ㅇ·①·※ 2칸, 영문·공백 1칸
+  // 첫 줄은 원래 들여쓰기(ind)에서, 접힌 줄은 기호 뒤(ind+mw)에서 시작 = 매달린 들여쓰기
+  const sty=(ind+mw)?` style="padding-left:${ind+mw}ch${mw?`;text-indent:-${mw}ch`:""}"`:"";
+  return `<div class="jl${cls?" "+cls:""}"${sty}>`+
+    `${mk?`<span class="jm">${esc(mk)}</span>`:""}<span class="jt">${jText(rest,cls)}</span></div>`;
+}
+function jDoc(text){
+  const L=String(text||"").replace(/\r\n?/g,"\n").split("\n").map(s=>jTabs(s).replace(/\s+$/,""));
+  const cand=L.map(s=>J_GAP.test(s.trim()));
+  let h="", i=0;
+  while(i<L.length){
+    if(cand[i]){                                       // 표 묶음: 후보 줄 + 사이의 빈 줄 1개까지
+      let j=i, n=0, last=i;
+      while(j<L.length){
+        if(cand[j]){n++; last=j; j++;}
+        else if(!L[j].trim()&&j+1<L.length&&cand[j+1])j++;
+        else break;
+      }
+      if(n>=2){
+        h+=`<div class="jtbl"><div>`+L.slice(i,last+1).map(s=>s.trim()?`<div class="jl">${jInline(s)}</div>`:`<div class="jl jb"></div>`).join("")+`</div></div>`;
+        i=last+1; continue;
+      }
+    }
+    h+=jLine(L[i]); i++;
+  }
+  return `<div class="jdoc">${h}</div>`;
+}
+/* 미리보기(카드·종목 화면): 정해진 줄 수만 보여주고 넘치면 흐림 + '이어서 보기' */
+function jClamp(text,lines,id,extraCls){
+  return `<div class="jclamp${extraCls?" "+extraCls:""}" style="--jl:${lines}">${jDoc(text)}</div>`+
+    `<span class="jmore k" data-jid="${escA(id)}">▾ 이어서 보기</span>`;
+}
+function fitClamps(){
+  document.querySelectorAll(".jclamp").forEach(e=>e.classList.toggle("over",e.scrollHeight>e.clientHeight+2));
+}
+let _fitT=null;
+window.addEventListener("resize",()=>{clearTimeout(_fitT);_fitT=setTimeout(fitClamps,150);});
+try{if(document.fonts&&document.fonts.addEventListener)document.fonts.addEventListener("loadingdone",()=>fitClamps());}catch(e){}
+
+/* === [V43] 일지 읽기 창 — 목록·카드·종목 화면 어디서든 눌러서 1건 전체를 본다 === */
+let JM_ID=null;
+function jOpen(id){
+  const j=jFind(id); if(!j)return;
+  JM_ID=String(j.id); MODAL=true;
+  const m=el("modal"); m.className="jm"; el("modalbg").classList.add("jm");
+  const sts=["활성","관찰","검증됨","폐기"];
+  m.innerHTML=   // 제목 줄만 위에 고정(스크롤해도 닫기 버튼이 보이게), 나머지 정보는 본문과 함께 스크롤
+   `<div class="jmh"><div class="jmt">${esc(j.title||"(무제)")}</div><span class="k" onclick="modalClose()" style="flex:none">✕ 닫기</span></div>
+    <div class="jmeta"><span class="${KIND_COL[j.kind]||'muted'} b">${esc(j.kind)}</span>${j.tk?(BY[j.tk]?symLink(j.tk):`<span>${esc(j.tk)}</span>`):""}<span class="${ST_COL[j.status]||'muted'} b">[${esc(j.status)}]</span><span>작성 ${esc(j.d||"")}</span>${j.upd&&j.upd!==j.d?`<span>수정 ${esc(j.upd)}</span>`:""}<span>${esc(j.id)}</span></div>
+    <div class="jact">${LIVE_ON?`<span class="muted">상태</span>${sts.map(s=>`<span class="k${s===j.status?" jcur":""}" data-jst="${s}">${s}</span>`).join("")}<span class="muted">|</span>`:""}<span class="k" data-jcopy="1">📋 원문 복사</span><span id="jcmsg"></span></div>
+    ${j.text?`<div class="jsec">${jDoc(j.text)}</div>`:`<div class="jsec muted">(내용 없음)</div>`}
+    ${j.falsify?`<div class="jsec jfal"><div class="jsec-h dn">반증 조건</div>${jDoc(j.falsify)}</div>`:""}`;
+  el("modalbg").style.display="flex"; m.scrollTop=0;
+}
+function jMsg(html){const m=el("jcmsg");if(m)m.innerHTML=html;}
+async function jSetStatus(st){
+  const id=JM_ID; if(!id)return;
+  if(!LIVE_ON){jMsg("<span class='dn'>LIVE 연결 필요</span>");return;}
+  if(SAVING){jMsg("<span class='warn'>다른 저장을 확인하는 중 — 잠시 뒤 다시</span>");return;}
+  jMsg("<span class='warn'>상태 변경 전송 — 시트 확인 중…</span>");
+  await thesisStatus(id,st);
+  if(MODAL&&JM_ID===id){
+    const j=jFind(id); jOpen(id);
+    jMsg(j&&j.status===st?`<span class='up'>✓ 상태 → ${esc(st)}</span>`:"<span class='warn'>확인이 늦어짐 — 잠시 뒤 R로 확인</span>");
+  }
+}
+function jCopyFallback(s){
+  try{const t=document.createElement("textarea");t.value=s;t.setAttribute("readonly","");
+    t.style.cssText="position:fixed;top:0;left:0;opacity:0";document.body.appendChild(t);t.select();
+    const ok=document.execCommand("copy");t.remove();return ok;}catch(e){return false;}
+}
+function jCopy(){
+  const j=jFind(JM_ID); if(!j)return;
+  const s=[j.title||"","",j.text||""].concat(j.falsify?["","[반증 조건]",j.falsify]:[]).join("\n");
+  const done=ok=>jMsg(ok?"<span class='up'>✓ 복사됨 (줄바꿈 그대로)</span>":"<span class='dn'>복사 실패 — 본문을 길게 눌러 선택하세요</span>");
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(s).then(()=>done(true),()=>done(jCopyFallback(s)));
+  else done(jCopyFallback(s));
+}
+
+function vThesis(){
+  const th=JOURNAL.filter(j=>j.kind==="테제");
+  const live=th.filter(j=>j.status!=="폐기");
+  const dead=th.filter(j=>j.status==="폐기");
+  const logs=JOURNAL.filter(j=>j.kind!=="테제");
+  const f=TH_FILTER;
+  const shown=f?logs.filter(j=>j.tk===f):logs;
+
+  const stChip=st=>`<span class="${ST_COL[st]||'muted'} b">[${esc(st)}]</span>`;
+  // === [V43] 원문 서식 그대로(줄바꿈·들여쓰기·표) + 앞부분만 미리보기, 제목·'전체 보기'를 누르면 읽기 창 ===
+  const card=j=>{const id=_idSafe(j.id), a=escA(j.id);
+    return `<div class="panel" style="margin-bottom:8px"><div class="ph jhd" data-jid="${a}" title="눌러서 전체 보기"><span class="jhl">${(j.tk?symLink(j.tk)+" · ":"")+esc(j.title||"(무제)")}</span><span class="rt">${esc(j.d||"")}</span></div><div class="pb">
+      <div class="jbar">${stChip(j.status)}<span class="k mono-sm" data-jid="${a}">전체 보기 ▸</span></div>
+      ${j.text?jClamp(j.text,14,j.id):""}
+      ${j.falsify?`<div class="sep"></div><div class="jsec-h dn">반증 조건</div>${jClamp(j.falsify,8,j.id,"jfalc")}`:""}
+      ${LIVE_ON?`<div class="sep"></div><div class="mono-sm muted">상태 변경:
+        <span class="k" onclick="thesisStatus('${id}','활성')">활성</span>
+        <span class="k" onclick="thesisStatus('${id}','관찰')">관찰</span>
+        <span class="k" onclick="thesisStatus('${id}','검증됨')">검증됨</span>
+        <span class="k" onclick="thesisStatus('${id}','폐기')">폐기</span></div>`:""}
+    </div></div>`;};
+
+  // === [V43] 행을 누르면 읽기 창. 미리보기는 공백을 접은 한 줄 요약(원문은 읽기 창에서 서식 그대로) ===
+  const flat=s=>String(s||"").replace(/\s+/g," ").trim();
+  const logRows=shown.map(j=>{const p=flat(j.text);
+    return `<tr class="row jrow" data-jid="${escA(j.id)}" title="눌러서 전체 보기"><td>${esc((j.d||"").slice(5,16))}</td>
+    <td><span class="${KIND_COL[j.kind]||'muted'} b">${esc(j.kind)}</span></td>
+    <td>${j.tk?(BY[j.tk]?symLink(j.tk):esc(j.tk)):"—"}</td>
+    <td style="text-align:left" class="b jttl">${esc(j.title||"(무제)")}</td>
+    <td style="text-align:left" class="mono-sm jprev">${esc(p.slice(0,90))}${p.length>90?"…":""}</td></tr>`;}).join("");
+
+  // === [V31] 배포 신선도 배지 — doGet이 gasVer를 주면 그 배포에 doPost도 들어있다 ===
+  const gasBadge = !LIVE_ON ? `<span class="tag muted">OFFLINE</span>`
+    : (LIVE_GAS.ver ? `<span class="tag up">GAS ${esc(LIVE_GAS.ver)} · 쓰기 가능</span>`
+                    : `<span class="tag dn">GAS 구버전 — 재배포 필요</span>`);
+
+  const form=`<div class="panel">${ph("새 기록",gasBadge)}<div class="pb">
+     ${LIVE_ON?"":"<div class='banner'>LIVE 연결 시 저장 가능. 지금은 보기 전용.</div>"}
+     ${(LIVE_ON&&!LIVE_GAS.ver)?"<div class='banner'>배포된 Apps Script가 doPost 이전 버전입니다. 저장을 눌러도 Journal 탭에 기록되지 않습니다 — 배포 &gt; 배포 관리 &gt; 연필 &gt; 새 버전으로 배포.</div>":""}
+     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+       <select id="thKind" style="background:#161b22;color:var(--fg);border:1px solid var(--bd);padding:4px"><option>매매일지</option><option>테제</option><option>아이디어</option></select>
+       <input id="thTk" placeholder="티커(선택)" style="width:110px;background:#161b22;color:var(--fg);border:1px solid var(--bd);padding:4px">
+       <input id="thTitle" placeholder="제목" style="flex:1;min-width:200px;background:#161b22;color:var(--fg);border:1px solid var(--bd);padding:4px">
+     </div>
+     <textarea id="thText" class="jin" rows="8" placeholder="내용 — 매매 근거·관찰·아이디어" style="width:100%;background:#161b22;color:var(--fg);border:1px solid var(--bd);padding:4px;box-sizing:border-box"></textarea>
+     <textarea id="thFal" class="jin" rows="5" placeholder="반증 조건 (테제일 때 — 이게 일어나면 테제 폐기)" style="width:100%;background:#161b22;color:var(--fg);border:1px solid var(--bd);padding:4px;box-sizing:border-box;margin-top:4px"></textarea>
+     <div style="margin-top:6px"><span id="thSave" class="k" onclick="thesisAdd()" style="${LIVE_ON?'':'opacity:.4;pointer-events:none'}">💾 저장</span>
+     <span id="thMsg" class="mono-sm" style="margin-left:8px"></span>
+     <div class="muted mono-sm" style="margin-top:4px">시트 Journal 탭에서도 직접 편집 가능 (양방향) · 작성 중인 글은 저장이 확인될 때까지 이 기기에 자동 보관 · 줄바꿈·들여쓰기·공백으로 맞춘 표는 쓴 그대로 보입니다 (□ ㅇ - ① ※ 는 단계별로 색 구분)</div></div>
+  </div></div>`;
+
+  return vHeader("THESIS")+form+
+   `<div class="grid g2">
+     <div style="min-width:0">${live.length?live.map(card).join(""):"<div class='panel'><div class='pb muted'>활성 테제 없음 — 위 폼에서 '테제'로 저장하거나 시트 Journal 탭에 입력</div></div>"}
+       ${dead.length?`<div class="muted mono-sm" style="margin:4px 0">폐기된 테제 ${dead.length}건 (Journal 탭에 보존)</div>`:""}</div>
+     <div class="panel">${ph("매매일지 · 아이디어",`${shown.length}건${f?" · 필터 "+esc(f):""} · 행을 누르면 전체 보기`)}<div class="pb">
+       <div style="margin-bottom:6px"><input id="thFilter" value="${esc(f)}" placeholder="티커 필터 (비우면 전체)" onchange="TH_FILTER=this.value.trim().toUpperCase();render()" style="background:#161b22;color:var(--fg);border:1px solid var(--bd);padding:4px"></div>
+       <table><tr><th>일시</th><th>구분</th><th>티커</th><th style="text-align:left">제목</th><th style="text-align:left" class="jprev">내용</th></tr>${logRows||"<tr><td class='muted' colspan='5'>기록 없음</td></tr>"}</table>
+     </div></div>
+   </div>`;
+}
+
+/* === [V22] Weinstein 스테이지 뷰 === */
+const STAGE_META={1:["바닥·축적","cyan","기저 형성. 돌파 대기 — 관찰 리스트"],
+                  2:["상승·마크업","up","추세 진행. 신규/추가 매수 국면"],
+                  3:["천정·분산","warn","모멘텀 소진. 신규 매수 자제·비중 축소 검토"],
+                  4:["하락·마크다운","dn","추세 하락. 보유 시 규칙 점검 필요"]};
+function stageChip(label){
+  const n=parseInt(label,10);
+  if(!n||!STAGE_META[n])return `<span class="muted">${esc(label||"—")}</span>`;
+  return `<span class="${STAGE_META[n][1]} b">${esc(label)}</span>`;
+}
+
+function vStage(){
+  const cov=U.filter(o=>o.stageNum);
+  const none=U.filter(o=>!o.stageNum).map(o=>o.tk);
+  const cnt={1:0,2:0,3:0,4:0}; cov.forEach(o=>cnt[o.stageNum]++);
+  const tot=cov.length||1;
+  const bull=((cnt[1]+cnt[2])/tot*100);
+
+  const dist=[1,2,3,4].map(n=>{
+    const w=(cnt[n]/tot*100);
+    return `<div style="margin-bottom:5px"><span class="${STAGE_META[n][1]} b">${n} ${STAGE_META[n][0]}</span>
+      <span class="muted">${cnt[n]}종목 (${w.toFixed(0)}%)</span>
+      <div style="height:8px;background:#161b22;border:1px solid var(--bd);margin-top:2px">
+        <div style="height:100%;width:${w.toFixed(1)}%;background:var(--${STAGE_META[n][1]});opacity:.6"></div></div></div>`;
+  }).join("");
+
+  // 보유 중 Stage 3/4 = 최우선 경고
+  const warn=cov.filter(o=>o.held&&o.stageNum>=3)
+    .sort((a,b)=>b.stageNum-a.stageNum)
+    .map(o=>`<div><span class="${o.stageNum===4?'dn':'warn'} b">${esc(o.stage)}</span> ${symLink(o.tk)}
+       <span class="muted">손익 </span><span class="${cls(o.pnl)}">${pct(o.pnl)}</span>
+       <span class="muted">· RS </span><span class="${cls(o.rs)}">${fmt(o.rs)}</span></div>`).join("");
+
+  const rows=cov.slice().sort((a,b)=>a.stageNum-b.stageNum||b.rs-a.rs).map(o=>
+    `<tr class="row">${symTd(o.tk)}<td>${o.held?"<span class='cyan'>●</span>":""}</td><td>${stageChip(o.stage)}</td>
+     <td style="text-align:left" class="muted">${esc(o.sec)}</td>
+     <td class="${cls(o.rs)}">${fmt(o.rs)}</td><td class="${o.ud>1?'up':'muted'}">${fmt(o.ud)}</td>
+     <td class="${cls(o.ddFromHi)}">${pct(o.ddFromHi)}</td>
+     <td class="muted mono-sm" style="text-align:left">${esc(STAGE_META[o.stageNum][2])}</td></tr>`).join("");
+
+  return vHeader("STAGE")+
+   `<div class="grid g3">
+     <div class="panel">${ph("STAGE 분포","Weinstein 4단계 · 주봉 30주선 기준")}<div class="pb">${dist}
+        <div class="sep"></div><div><span class="muted">강세(1+2) 비중</span> <span class="${bull>=50?'up':'dn'} kpi" style="font-size:18px">${bull.toFixed(0)}%</span></div></div></div>
+     <div class="panel">${ph("보유 · 주의 필요","Stage 3/4 보유 포지션")}<div class="pb">${warn||"<span class='up'>보유 종목 모두 Stage 1/2 — 이상 없음</span>"}</div></div>
+     <div class="panel">${ph("판정 기준")}<div class="pb">
+       <div class="mono-sm"><span class="cyan b">1 바닥</span> 하락 후 30주선 평탄 + 가격 횡보</div>
+       <div class="mono-sm"><span class="up b">2 상승</span> 가격이 <b>상승하는</b> 30주선 위</div>
+       <div class="mono-sm"><span class="warn b">3 천정</span> 상승 후 30주선 평탄 + 모멘텀 소진</div>
+       <div class="mono-sm"><span class="dn b">4 하락</span> 가격이 <b>하락하는</b> 30주선 아래</div>
+       <div class="sep"></div>
+       <div class="muted mono-sm">2년 주봉 실측. 상장 35주 미만은 판정 불가(—).${none.length?` 미판정: ${none.map(esc).join(", ")}`:""}</div>
+     </div></div>
+   </div>
+   <div class="panel">${ph("STAGE LADDER","단계 → RS 순")}<div class="pb"><table>
+     <tr><th>티커</th><th>보유</th><th>스테이지</th><th style="text-align:left">섹터</th><th>RS</th><th>U/D</th><th>고점대비</th><th style="text-align:left">대응</th></tr>${rows||"<tr><td class='muted'>스테이지 데이터 없음 — Dashboard '스테이지' 열이 채워지면 표시됩니다</td></tr>"}</table></div></div>`;
+}
+
+function vVal(){
+  const rows=U.filter(o=>o.pz!=null).slice().sort((a,b)=>a.pz-b.pz).map(o=>{
+    const z=o.pz, sig=z<-1?"저평가":z>1?"고평가":"중립", col=z<-1?"up":z>1?"dn":"muted";
+    return `<tr class="row">${symTd(o.tk)}<td>${fmt(o.p27)}</td><td class="${col} b">${fmt(z,2)}σ</td><td>${o.ppct.toFixed(0)}%ile</td><td>${barSpan(z,3,z<0?'#33d17a':'#ff5b5b')}</td><td class="${col}">${sig}</td><td>${fmt(o.peg27)}</td><td>${spark(o._w.per.filter(x=>x!=null),110,24,'#c08cff')}</td></tr>`;
+  }).join("");
+  const noHist=U.filter(o=>o.pz==null).map(o=>o.tk);
+  return vHeader("VAL")+
+   `<div class="panel">${ph("VALUATION Z-SCORE","현재 27년 PER vs 자기 26주 히스토리 (z / 백분위)")}<div class="pb"><table>
+     <tr><th>티커</th><th>27E PER</th><th>Z-스코어</th><th>백분위</th><th></th><th>신호</th><th>PEG27</th><th>PER 추이</th></tr>${rows}</table>
+     <div class="muted mono-sm" style="margin-top:6px">적자/PER 부재로 제외: ${noHist.map(esc).join(", ")||"없음"}. ※ 절대 PER이 아니라 자기 역사 대비 위치 — 평균회귀 셋업 포착. KOSPI PER/PBR 밴드 방법론 이식.</div></div></div>`;
+}
+
+function vSig(){
+  const s=BT;
+  const card=(t,o,note)=>`<div class="panel">${ph(t)}<div class="pb"><div class="kpi ${o.avg>=0?'up':'dn'}">${pct(o.avg)}</div><div>적중률 <span class="${o.hit>=50?'up':'dn'} b">${o.hit.toFixed(0)}%</span> · 표본 ${o.n}</div><div class="muted mono-sm">${note}</div></div></div>`;
+  const calls=NEWS.filter(n=>n.typ==="목표가변경").map(n=>`<tr class="row"><td>${n.d.slice(5)}</td><td style="text-align:left">${esc(n.src)}</td><td style="text-align:left">${n.tk.map(t=>BY[t]?symLink(t):esc(t)).join(",")}</td><td class="${n.tc.includes('-')?'dn':'up'}">${esc(n.tc)}</td><td class="muted">${BY[n.tk[0]]?"결과 대기":"유니버스 외"}</td><td>${n.sim?"<span class='tag muted'>SIM</span>":"<span class='tag' style='color:var(--up)'>실</span>"}</td></tr>`).join("");
+  return vHeader("SIG")+
+   `<div class="grid g2">
+     ${card("신호 A · RS 0선 상향돌파 → 4주","undefined"===typeof s?{}:s.rsX,"유니버스 전체·시드 주간. 모멘텀 진입 신호의 순방향 기대수익")}
+     ${card("신호 B · 자기PER z<-1 → 4주",s.zLow,"밸류 되돌림 진입. 평균회귀 신호의 4주 성과")}
+   </div>
+   <div class="panel">${ph("ANALYST CALL LEDGER","목표가 변경 콜 → 실현 검증 (출처별 적중률)")}<div class="pb"><table>
+     <tr><th>일자</th><th style="text-align:left">출처</th><th style="text-align:left">티커</th><th>목표가Δ</th><th>결과</th><th>구분</th></tr>${calls||"<tr><td class='muted'>목표가 변경 콜 없음</td></tr>"}</table>
+     <div class="muted mono-sm" style="margin-top:6px">※ 실측 목표가콜은 유니버스 외(HK/KR)라 결과 미산출. LIVE 시 목표가변동 + Database 사후가격으로 출처별 hit-rate 집계. 백테스트 표본 작음 — 방향성 참고용, 커브피팅 경계.</div></div></div>`;
+}
+
+function vSec(tk){
+  const o=BY[tk]; if(!o)return vHeader("MENU")+`<div class="banner">알 수 없는 코드: ${esc(tk)}. HELP 입력 또는 하단 함수키.</div>`+vMenu();
+  const news=newsFor(tk,60);
+  const flags=[o.fStop?"<span class='dn tag'>STOP</span>":"",o.fMA?"<span class='warn tag'>&lt;MA20</span>":"",o.fDD?"<span class='dn tag'>DD-10</span>":""].filter(Boolean).join(" ")||"<span class='up'>정상</span>";
+  const kv=(k,v)=>`<tr><td class="muted" style="text-align:left">${k}</td><td class="b">${v}</td></tr>`;
+  return `<div class="viewhdr"><span class="code">${tk}</span><span class="ttl">${esc(o.sec)}</span><span class="sub">${usd(o.px)} · 목표 ${usd(o.tgt)} (괴리 ${pct(o.gap)})${o.stage?" · "+stageChip(o.stage):""}</span></div>
+   ${tvPanel(tk)}
+   <div class="grid g3">
+     <div class="panel">${ph("QUOTE / MOMENTUM")}<div class="pb"><table>
+        ${kv("현재가",usd(o.px))}${kv("RS(상대강도)",`<span class="${cls(o.rs)}">${fmt(o.rs)}</span>`)}${kv("RS 4주 모멘텀",`<span class="${cls(o.rsMom)}">${fmt(o.rsMom)}</span>`)}${kv("U/D Ratio",`<span class="${o.ud>1?'up':'muted'}">${fmt(o.ud)}</span>`)}${kv("목표가 괴리",`<span class="up">${pct(o.gap)}</span>`)}
+     </table><div style="margin-top:4px">${spark(o._d.c,240,34,'#4fd4ff')}</div></div></div>
+     <div class="panel">${ph("VALUATION")}<div class="pb"><table>
+        ${kv("27E PER",fmt(o.p27))}${kv("28E PER",fmt(o.p28))}${kv("PER Z-스코어",o.pz!=null?`<span class="${o.pz<-1?'up':o.pz>1?'dn':'muted'}">${fmt(o.pz,2)}σ (${o.ppct.toFixed(0)}%ile)</span>`:"—")}${kv("PEG 27/28",`${fmt(o.peg27)} / ${fmt(o.peg28)}`)}${kv("성장률 27/28",`${pct(o.g27)} / ${pct(o.g28)}`)}
+     </table></div></div>
+     <div class="panel">${ph("RISK / RULES")}<div class="pb"><table>
+        ${kv("ATR손절가",usd(o.stop))}${kv("손절까지",`<span class="${o.px<o.stop?'dn':'muted'}">${pct((o.px/o.stop-1)*100)}</span>`)}${kv("MA20",`${usd(o.ma20)} <span class="${cls(o.px-o.ma20)}">${o.px<o.ma20?'하회':'상회'}</span>`)}${kv("고점(60d)대비",`<span class="${cls(o.ddFromHi)}">${pct(o.ddFromHi)}</span>`)}${kv("규칙상태",flags)}
+     </table></div></div>
+   </div>
+   <div class="grid g3">
+     <div class="panel">${ph("EST REVISION")}<div class="pb"><table>${kv("선행 EPS",fmt(o.e27))}${kv("WoW",`<span class="${cls(o.wow)}">${pct(o.wow,2)}</span>`)}${kv("4주",o.rev4!=null&&isFinite(o.rev4)?`<span class="${cls(o.rev4)}">${pct(o.rev4)}</span>`:"<span class='muted'>—</span>")}${kv("출처",o.epsReal?`<span class="up">실측 ${o.epsN}주</span>`:"<span class='muted'>시드</span>")}</table><div style="margin-top:4px">${spark(o.epsSeries,200,28,(o.rev4??o.wow)>=0?'#33d17a':'#ff5b5b')}</div></div></div>
+     <div class="panel">${ph("POSITION")}<div class="pb">${o.held?`<table>${kv("수량",o.qty)}${kv("평단",usd(o.avg))}${kv("손익%",`<span class="${cls(o.pnl)} b">${pct(o.pnl)}</span>`)}${kv("미실현$",usd(o.upl,0))}${kv("비중",(o.mv/PORT.mv*100).toFixed(1)+"%")}</table>`:"<span class='muted'>미보유</span>"}</div></div>
+     <div class="panel">${ph("NEWS SIDECAR")}<div class="pb"><div>심리 ${o.nSent==null?"<span class='muted'>—</span>":`<span class="${o.nSent>0?'up':o.nSent<0?'dn':'muted'} b">${fmt(o.nSent,2)}</span>`} · 30D ${o.nCnt30} · 목표가Δ ${esc(o.nLastTC)||"—"}</div><div class="sep"></div>${news.length?news.map(n=>`<div class="mono-sm"><span class="muted">${n.d.slice(5)}</span> <span class="${n.dir==='강세'?'up':n.dir==='약세'?'dn':'muted'}">${n.dir}</span> ${esc(n.th).slice(0,52)} ${n.sim?"<span class='tag muted'>SIM</span>":""}</div>`).join(""):"<span class='muted'>커버리지 없음</span>"}</div></div>
+   </div>
+   ${(()=>{
+     /* === [V32] 종목 상세: '테제'만이 아니라 이 종목의 Journal 기록 전체를 보여준다 ===
+        기존에는 kind==="테제"인 것만 걸렀다. 그런데 저장 폼의 기본 선택값이 '매매일지'라,
+        구분을 바꾸지 않고 저장한 기록은 종목 화면에 아예 뜨지 않았다.
+        게다가 0건이면 패널 자체를 렌더하지 않아 '기록이 없는 것'과 '화면이 고장난 것'을
+        구분할 수 없었다 → 항상 패널을 띄우고, 없으면 없다고 말한다. */
+     const mine=JOURNAL.filter(j=>j.tk===tk&&j.status!=="폐기");
+     const rank={"테제":0,"매매일지":1,"아이디어":2};
+     mine.sort((a,b)=>((rank[a.kind]??9)-(rank[b.kind]??9))||String(b.d||"").localeCompare(String(a.d||"")));
+     const nTh=mine.filter(j=>j.kind==="테제").length;
+     const head=ph("THESIS · JOURNAL — 이 종목",
+       mine.length?`테제 ${nTh} · 전체 ${mine.length}건 · 상태 관리는 12 THESIS`:"기록 없음");
+     if(!mine.length)return `<div class="panel">${head}<div class="pb">
+        <div class="muted mono-sm">${esc(tk)} 관련 기록이 없습니다. <span class="k" onclick="go('12')">12 THESIS</span> 에서 남기면 여기에 표시됩니다. (구분을 '테제'로 저장하면 테제로 집계됩니다)</div>
+       </div></div>`;
+     // === [V43] 원문 서식 그대로 미리보기 + 제목 줄을 누르면 읽기 창 ===
+     return `<div class="panel">${head}<div class="pb">`+
+       mine.map(j=>{const a=escA(j.id); return `<div class="jent">
+         <div class="jhd2" data-jid="${a}" title="눌러서 전체 보기">
+           <span class="${KIND_COL[j.kind]||'muted'} b">${esc(j.kind)}</span>
+           <span class="${ST_COL[j.status]||'muted'} b">[${esc(j.status)}]</span>
+           <span class="b">${esc(j.title||"(무제)")}</span>
+           <span class="muted mono-sm">${esc((j.d||"").slice(0,10))}</span>
+           <span class="k mono-sm">전체 보기 ▸</span></div>
+         ${j.text?jClamp(j.text,10,j.id):""}
+         ${j.falsify?`<div class="jsec-h dn" style="margin-top:6px">반증 조건</div>${jClamp(j.falsify,6,j.id,"jfalc")}`:""}</div>`;}).join("")+`</div></div>`;})()}`;
+}
+
+function vHelp(){
+  const rows=FUNCS.map((f,i)=>`<tr class="row"><td class="amber b">${i+1}</td><td class="cyan b">${f}</td><td style="text-align:left">${FMETA[f][0]}</td><td style="text-align:left" class="muted">${FMETA[f][1]}</td></tr>`).join("");
+  return vHeader("MENU")+`<div class="panel">${ph("HELP · 함수 코드")}<div class="pb"><table><tr><th>#</th><th>코드</th><th style="text-align:left">이름</th><th style="text-align:left">설명</th></tr>${rows}
+     <tr class="row"><td></td><td class="cyan b">&lt;티커&gt;</td><td style="text-align:left">종목 마스터</td><td style="text-align:left" class="muted">예: AVGO — 모든 지표 통합 뷰</td></tr>
+     <tr class="row"><td></td><td class="cyan b">MENU</td><td style="text-align:left">런치패드</td><td style="text-align:left" class="muted">ESC 로도 이동</td></tr>
+     <tr class="row"><td></td><td class="cyan b">SETUP</td><td style="text-align:left">연결 설정</td><td style="text-align:left" class="muted">웹앱 URL·일지 키 입력/삭제 (이 기기에만 저장) · 하단 ⚙</td></tr></table>
+     <div class="muted mono-sm" style="margin-top:8px">단축키: 숫자 1–9,0(=10) 함수 이동 · ESC 메뉴 · / 명령창 포커스 · R 즉시 갱신 (자동 갱신 ${CONFIG.REFRESH_MIN||0}분)</div></div></div>`;
+}
+
+/* ================================ ROUTER ================================ */
+let state={view:"MENU"};
+function render(){
+  thDraftSave();                                      // === [V42] 폼이 떠 있으면 먼저 보관
+  const v=state.view;
+  let html;
+  if(v==="MENU")html=vMenu();
+  else if(v==="HELP")html=vHelp();
+  else if(v==="NEWS")html=vNews();
+  else if(v==="CAT")html=vCat();
+  else if(v==="MAP")html=vMap();
+  else if(v==="RISK")html=vRisk();
+  else if(v==="PORT")html=vPort();
+  else if(v==="REGIME")html=vRegime();
+  else if(v==="RRG")html=vRRG();
+  else if(v==="REV")html=vRev();
+  else if(v==="VAL")html=vVal();
+  else if(v==="SIG")html=vSig();
+  else if(v==="STAGE")html=vStage();
+  else if(v==="THESIS")html=vThesis();
+  else if(v.startsWith("SEC:"))html=vSec(v.slice(4));
+  else html=vMenu();
+  el("screen").innerHTML=html;
+  if(v==="THESIS")thDraftRestore();                   // === [V42] 작성 중이던 글 복원
+  el("screen").scrollTop=0;
+  fitClamps();                                        // === [V43] 넘치는 미리보기에만 흐림·'이어서 보기'
+}
+function go(cmd){
+  cmd=(cmd||"").trim().toUpperCase();
+  if(!cmd)return;
+  if(cmd==="MENU"||cmd==="HOME"||cmd==="M"){state.view="MENU";}
+  else if(cmd==="HELP"||cmd==="H"||cmd==="?"){state.view="HELP";}
+  else if(cmd==="SETUP"||cmd==="SET"){openSetup();return;}
+  else if(FUNCS.includes(cmd)){state.view=cmd;}
+  else if(/^(1[0-2]|[1-9])$/.test(cmd)){state.view=FUNCS[parseInt(cmd)-1];}
+  else if(BY[cmd]){state.view="SEC:"+cmd;}
+  else{state.view="HELP"; render(); flashHint(`알 수 없는 코드: ${cmd}`); return;}
+  render();
+}
+/* === [V24] 뉴스 팝업 === */
+function newsModal(i){
+  const n=NEWS[i]; if(!n)return;
+  MODAL=true; jModalReset();                          // === [V43] 일지 읽기 창 모양을 걷어낸다
+  const dirCol=n.dir==='강세'?'up':n.dir==='약세'?'dn':'muted';
+  const tks=(n.tk||[]).map(t=>BY[t]?symLink(t):`<span class="muted">${esc(t)}</span>`).join(", ")||"—";
+  el("modal").innerHTML=
+    `<div style="display:flex;justify-content:space-between;align-items:center">
+       <span class="amber b" style="font-size:14px">${esc(n.th||"(제목 없음)")}</span>
+       <span class="k" onclick="modalClose()">✕ 닫기 (ESC)</span></div>
+     <div class="muted mono-sm" style="margin-top:4px">${esc(n.d)} · ${esc(n.src)} · ${esc(n.typ)} · <span class="${dirCol} b">${esc(n.dir)}</span>${n.tc?` · 목표가Δ <span class="${n.tc.includes('-')?'dn':'up'}">${esc(n.tc)}</span>`:""}</div>
+     <div style="margin-top:6px">티커: ${tks}</div>
+     ${n.thesis&&n.thesis!==n.th?`<div class="sep"></div><div><span class="b">핵심논지</span><div class="mono-sm" style="margin-top:2px">${esc(n.thesis)}</div></div>`:""}
+     ${n.raw?`<div class="sep"></div><div><span class="b">원문</span><div class="mraw">${esc(n.raw)}${n.raw.length>=900?" …":""}</div></div>`:""}
+     <div style="margin-top:10px">
+       ${n.url?`<a class="k" href="${esc(n.url)}" target="_blank" style="text-decoration:none">📄 시트에서 이 행 열기</a>`:""}
+       ${n.sim?"<span class='tag muted'>SIM 데모 항목</span>":""}
+     </div>`;
+  el("modalbg").style.display="flex";
+}
+function jModalReset(){JM_ID=null;el("modal").className="";el("modalbg").classList.remove("jm");}   // === [V43]
+function modalClose(){MODAL=false;el("modalbg").style.display="none";jModalReset();}
+
+function flashHint(m){const h=el("cmdhint");const old=h.innerHTML;h.innerHTML=`<span class='dn'>${esc(m)}</span>`;setTimeout(()=>h.innerHTML=old,2200);}
+
+/* 상단바 / 탭 / 시계 */
+/* === [V35] 접속 배지: 마지막 동기화가 얼마나 지났는지 항상 보이게 === */
+function syncAgeText(){
+  if(!LAST_SYNC)return "";
+  const s=Math.floor((Date.now()-LAST_SYNC)/1000);
+  if(s<60)return "방금";
+  if(s<3600)return Math.floor(s/60)+"분 전";
+  return Math.floor(s/3600)+"시간 전";
+}
+let _connCache="";
+function paintConn(){
+  if(!LIVE_ON)return;
+  const ms=LIVE_MS!=null?` · 서버 처리 ${(LIVE_MS/1000).toFixed(1)}초`:"";   // === [V42]
+  const t=LIVE_STALE
+    ?`<span class='warn k' onclick="manualSync()" title="마지막 갱신 실패: ${esc(LAST_LIVE_ERR)} — 클릭하면 다시 시도">● LIVE · 갱신 지연</span>`
+      +` <span class="muted mono-sm">마지막 갱신 ${syncAgeText()}</span>`
+    :`<span class='up k' onclick="manualSync()" title="클릭하면 즉시 갱신${ms}">● LIVE (${esc(CONFIG.ASOF||"")})</span>`
+      +` <span class="muted mono-sm">${syncAgeText()}</span>`;
+  if(t!==_connCache){_connCache=t; el("conn").innerHTML=t;}
+}
+function manualSync(){flashHint("갱신 중…");tryLive();}
+
+/* === [V35] 자동 갱신 ===
+   ⚠️ 작성 중인 글을 지우면 안 된다. render()가 화면을 통째로 다시 그리므로
+      입력 중이거나 팝업이 열려 있으면 이번 주기는 건너뛴다. */
+/* === [V42] 실패 후 빠른 재시도 (20초 → 1분 → 2분, 이후엔 5분 주기) === */
+let RETRY_T=null, RETRY_N=0;
+function scheduleRetry(){
+  if(RETRY_T)return null;
+  const waits=[20000,60000,120000];
+  const w=waits[Math.min(RETRY_N,waits.length-1)]; RETRY_N++;
+  RETRY_T=setTimeout(()=>{RETRY_T=null; autoSync();},w);
+  return w;
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState!=="visible"||!CONFIG.LIVE_URL)return;
+  const age=LAST_SYNC?Date.now()-LAST_SYNC:Infinity;
+  if(!LIVE_ON||LIVE_STALE||age>(CONFIG.REFRESH_MIN||5)*60000)autoSync();   // 다시 볼 때 낡았으면 즉시 갱신
+});
+function autoSync(){
+  if(!CONFIG.LIVE_URL||!CONFIG.REFRESH_MIN)return;
+  if(MODAL)return;
+  if(SAVING)return;                                   // === [V42] 저장 확인 중에는 무거운 갱신을 겹치지 않음
+  if(document.visibilityState==="hidden")return;      // === [V42] 안 보는 동안엔 요청 안 함 → 돌아오면 바로 갱신
+  /* === [V42] 명령창(CMD)은 화면을 열면 커서가 기본으로 들어가는 곳이라, 거기 커서가 있으면
+     '입력 중'으로 보고 건너뛰던 규칙 때문에 자동 갱신이 사실상 멈춰 있었다. 한 번 SIM으로
+     떨어지면 다시 시도하지 않아 켜둔 화면이 계속 SIM으로 남던 원인. → 명령창은 글자가 있을
+     때만 건너뛰고, 일지·필터 같은 다른 입력칸에 커서가 있을 때는 계속 건너뛴다. */
+  const a=document.activeElement;
+  if(a&&a.id==="cmd"){if(a.value.trim())return;}
+  else if(isTypingTarget(a))return;
+  tryLive({silent:true});
+}
+
+function paintTop(){
+  el("tbvix").textContent=CONFIG.VIX;
+  el("tbbr").textContent=REG.brdRS+"/11";
+  const rl=el("reglight");rl.textContent=REG.light[0];rl.style.color=`var(--${REG.light[1]})`;rl.style.borderColor=`var(--${REG.light[1]})`;
+  el("tbpl").innerHTML=`<span class="${cls(PORT.upl)}">${pct(PORT.ret)}</span>`;
+  // === [V23] 룰-위반 배지 (클릭 → RISK) ===
+  const tv=el("tbviol");
+  if(tv){tv.innerHTML=VIOL.length
+    ?`<span class="k" data-cmd="RISK" style="color:var(--dn);border-color:var(--dn)">⚠ 룰위반 ${VIOL.length} · ${VIOL.map(o=>o.tk).join(" ")}</span>`
+    :`<span class="muted mono-sm" style="margin-left:8px">룰 ✓</span>`;}
+}
+function paintTape(){
+  const q=U.map(o=>`<span class="tq"><span class="sym">${o.tk}</span> <span class="px">${usd(o.px)}</span> <span class="${cls(o.rs)}">${fmt(o.rs)}</span></span>`).join("");
+  el("tapeInner").innerHTML=q+q;
+}
+function paintFkeys(){
+  el("fkeys").innerHTML=FUNCS.map((f,i)=>`<span class="k" data-cmd="${f}">${i+1} ${f}</span>`).join("")+`<span class="k" data-cmd="MENU">MENU</span><span class="k" data-cmd="HELP">HELP</span><span class="k" data-cmd="SETUP" title="연결 설정">⚙</span>`;
+}
+/* === [V25] 홈화면 바로가기: index.html?v=RISK 처럼 시작 뷰 지정 === */
+function applyStartView(){
+  try{
+    const v=(new URLSearchParams(location.search).get("v")||"").toUpperCase();
+    if(v&&(FUNCS.includes(v)||v==="MENU")){state.view=v;}
+  }catch(e){}
+}
+
+function tick(){const d=new Date();el("clock").textContent=CONFIG.ASOF+" "+d.toLocaleTimeString("en-GB");}
+
+/* 이벤트 */
+document.addEventListener("click",e=>{
+  if(e.target.id==="modalbg"){modalClose();return;}                    // 배경 클릭 → 닫기
+  const t=e.target.closest("[data-cmd]");
+  if(t){if(MODAL)modalClose();go(t.getAttribute("data-cmd"));return;}  // 모달 안 티커 클릭 → 닫고 이동
+  const nn=e.target.closest("[data-news]");
+  if(nn){newsModal(+nn.getAttribute("data-news"));return;}
+  // === [V43] 일지 읽기 창: 열기 / 상태 변경 / 원문 복사
+  const jj=e.target.closest("[data-jid]");
+  if(jj){jOpen(jj.getAttribute("data-jid"));return;}
+  const js=e.target.closest("[data-jst]");
+  if(js){jSetStatus(js.getAttribute("data-jst"));return;}
+  if(e.target.closest("[data-jcopy]")){jCopy();return;}
+});
+el("cmd").addEventListener("keydown",e=>{if(e.key==="Enter"){go(e.target.value);e.target.value="";}else if(e.key==="Escape"){if(MODAL){modalClose();return;}e.target.value="";go("MENU");}});
+/* === [V32] 입력 중에는 전역 단축키를 잡지 않는다 ===
+   기존 핸들러는 el("cmd")만 예외로 뒀다. 그래서 THESIS 폼(제목·내용·반증조건·티커)이나
+   필터 입력창에 숫자를 치면 그 즉시 다른 함수 화면으로 넘어가 글이 날아갔다.
+   → 편집 가능한 요소(INPUT/TEXTAREA/SELECT/contenteditable)에 포커스가 있으면
+     숫자·'/'·ESC를 전부 그 요소에 넘긴다. ESC는 화면 이동 대신 포커스 해제로 처리. */
+function isTypingTarget(t){
+  if(!t)return false;
+  const tag=(t.tagName||"").toUpperCase();
+  return tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||t.isContentEditable===true;
+}
+document.addEventListener("keydown",e=>{
+  if(MODAL){if(e.key==="Escape")modalClose();return;}   // === [V24] 모달 우선
+  if(isTypingTarget(e.target)||isTypingTarget(document.activeElement)){
+    if(e.key==="Escape"&&document.activeElement!==el("cmd")){
+      e.preventDefault();
+      try{document.activeElement.blur();}catch(_){}
+    }
+    return;                                             // 숫자·'/'는 그대로 입력됨
+  }
+  if(e.key==="Escape"){go("MENU");}
+  else if(e.key==="/"){e.preventDefault();el("cmd").focus();}
+  else if(e.key==="r"||e.key==="R"){e.preventDefault();manualSync();}   // === [V35] 즉시 갱신
+  else if(/^[0-9]$/.test(e.key)){go(e.key==="0"?"10":e.key);}
+});
+
+
+/* LIVE 데이터: GAS doGet(Code.gs)이 Dashboard·Holdings 탭을 JSON으로 반환하면
+   RAW/HOLD/SECT/CONFIG를 교체하고 rebuildAll()로 전체 재조립 후 재렌더링.
+   NEWS/CATALYSTS(정성 데이터)는 별도 연동 전까지 데모(SIM) 유지.
+
+   === [V37] fetch → JSONP 전환 ===
+   증상: 브라우저 주소창으로 /exec 을 열면 JSON이 정상으로 보이는데,
+         이 파일(file://)의 fetch()는 항상 실패해 SIM 폴백이 떴다.
+   원인: file:// 페이지의 fetch는 Origin이 null이다. Apps Script는
+         /exec → script.googleusercontent.com 으로 302 리디렉션하는데,
+         이 조합에서 브라우저가 응답 읽기를 차단한다. 배포를 몇 번
+         다시 해도 해결되지 않는 이유다 — 배포 문제가 아니었다.
+   해법: <script> 태그 로드는 CORS 검사를 받지 않는다. doGet이
+         ?callback=이름 을 받으면 JSON을 이름(...)으로 감싸 JS로 돌려주고
+         (Code.gs V34), 여기서는 fetch 대신 script 태그로 불러온다.
+         file:// 에서도, https 호스팅에서도 동일하게 동작한다.
+   쓰기(doPost)는 fetch mode:"no-cors"로 전송한다 — 응답은 못 읽지만
+   기록은 되므로, 저장 후 JSONP로 Journal을 다시 읽어 실재 여부로 판정한다
+   (V31의 엔드투엔드 확인 원칙 그대로). */
+
+function jsonpGet(url,timeoutMs){
+  return new Promise((resolve,reject)=>{
+    const cb="__tk_jsonp_"+Date.now()+"_"+Math.floor(Math.random()*1e6);
+    const sc=document.createElement("script");
+    const timer=setTimeout(()=>{
+      cleanup();
+      reject(new Error(`응답 시간 초과(${Math.round((timeoutMs||25000)/1000)}초) — 서버(Apps Script) 처리가 늦었습니다. `
+        +"자주 반복되면 Apps Script 편집기 > 실행 기록에서 doGet 소요 시간을 확인하세요."));
+    },timeoutMs||25000);
+    function cleanup(){clearTimeout(timer);try{delete window[cb];}catch(e){}sc.remove();}
+    window[cb]=(data)=>{cleanup();resolve(data);};
+    sc.onerror=()=>{cleanup();reject(new Error("스크립트 로드 실패 (네트워크 또는 URL 오류)"));};
+    sc.src=url+(url.indexOf("?")>=0?"&":"?")+"callback="+cb+"&_ts="+Date.now();
+    document.head.appendChild(sc);
+  });
+}
+async function tryLive(opts){
+  const silent=!!(opts&&opts.silent);
+  if(!CONFIG.LIVE_URL)return;
+  const _prevNews=Array.isArray(NEWS)?NEWS.length:0;
+  let _scroll=0;
+  try{_scroll=(document.scrollingElement||document.documentElement).scrollTop||0;}catch(e0){}
+  try{
+    const j=await jsonpGet(CONFIG.LIVE_URL,45000);   // === [V37] fetch → JSONP · [V42] 전체 페이로드는 45초까지 기다림 ===
+    if(j && j.error) throw new Error(j.error);
+    if(!j || !Array.isArray(j.universe) || !j.universe.length) throw new Error("빈 응답(universe 없음)");
+
+    if(j.asof) CONFIG.ASOF=j.asof;
+    if(j.vix!=null) CONFIG.VIX=j.vix;
+
+    // universe row = [tk,sec,px,rs,ud,tgt,gap%,e0,e1,e2,p0,p1,p2,g1%,g2%,peg1,peg2, stopPx]
+    RAW=j.universe.map(row=>row.slice(0,17));
+    LIVE_STOP={}; LIVE_STAGE={}; LIVE_MA={};
+    j.universe.forEach(row=>{
+      if(row[17]!=null) LIVE_STOP[row[0]]=row[17];
+      if(row[18]) LIVE_STAGE[row[0]]=String(row[18]).trim();
+      // === [V34] 19~22 = MA20 · MA50 · 60일 고점 · 고점대비(%) ===
+      if(row[19]!=null||row[21]!=null)
+        LIVE_MA[row[0]]={ma20:row[19],ma50:row[20],hi60:row[21],dd:row[22]};
+    });
+    // === [V40] 주 1점으로 정리 (Code.gs V40이면 이미 정리돼 와서 그대로 통과)
+    LIVE_EPSH=weeklyHist((j.epsHist&&typeof j.epsHist==="object")?j.epsHist:{});
+    LIVE_RSH=weeklyHist((j.rsHist&&typeof j.rsHist==="object")?j.rsHist:{});
+    JOURNAL=Array.isArray(j.journal)?j.journal:[];
+    LIVE_GAS={ver:j.gasVer||null,hasPost:!!j.hasPost};   // === [V31] 배포 신선도
+    LIVE_INDEX=(j.index&&typeof j.index==="object")?j.index:null;
+
+    if(j.holdings) HOLD=j.holdings;
+    if(Array.isArray(j.sectors)&&j.sectors.length) SECT=j.sectors;
+    if(Array.isArray(j.news)) NEWS=j.news;   // telegram_report_index 실측 리포트로 교체 (없으면 SIM 데모 유지)
+    // === [V38] 촉매 캘린더 · 섹터 EPS (Catalysts / SectorEPS 탭) ===
+    // 탭이 비어 있으면 빈 배열이 온다 → CATALYSTS는 SIM 시드를 유지해 화면이
+    // 비어 보이지 않게 하고, 한 건이라도 있으면 통째로 교체한다.
+    if(Array.isArray(j.catalysts)&&j.catalysts.length) CATALYSTS=j.catalysts;
+    if(j.sectorEps&&Array.isArray(j.sectorEps.rows)) SECTOR_EPS=j.sectorEps;
+
+    LIVE_ON=true; LIVE_STALE=false; LIVE_MS=(j.ms!=null?j.ms:null);   // === [V42]
+    RETRY_N=0; if(RETRY_T){clearTimeout(RETRY_T);RETRY_T=null;}
+    rebuildAll();
+    paintTop();paintTape();paintFkeys();
+    render();
+    // === [V35] 자동 갱신 시 보던 위치를 잃지 않게 스크롤 복원 ===
+    if(silent){try{(document.scrollingElement||document.documentElement).scrollTop=_scroll;}catch(e1){}}
+    LAST_SYNC=Date.now(); _connCache=""; paintConn();
+    // === [V35] 새로 들어온 리포트 알림 (분류기가 태깅을 마친 건만 집계된다) ===
+    const _added=(Array.isArray(NEWS)?NEWS.length:0)-_prevNews;
+    if(silent&&_added>0) flashHint(`새 리포트 ${_added}건 — 1 NEWS`);
+  }catch(err){
+    LAST_LIVE_ERR=(err&&err.message)||String(err);
+    console.error("[tryLive] 실패:",err);
+    _connCache="";
+    if(LIVE_ON&&LAST_SYNC){
+      /* === [V42] 이미 실데이터를 받은 상태면 LIVE를 유지하고 '갱신 지연'만 표시 ===
+         V41까지는 갱신 한 번만 실패해도 전체가 SIM으로 떨어졌고, 그 상태에선 저장 버튼도 잠겼다
+         (2026-09-29 저장 직후 재조회가 늦어 발생). 화면의 데이터는 직전 값 그대로 유효하다. */
+      LIVE_STALE=true; paintConn(); scheduleRetry();
+      if(!silent)flashHint("갱신 실패 — 직전 데이터 유지 (다시 시도: R)");
+    }else{
+      LIVE_ON=false;
+      const w=scheduleRetry();
+      el("conn").innerHTML=`<span class='dn k' onclick="manualSync()" title="${esc(LAST_LIVE_ERR)} — 클릭하면 즉시 재시도">◆ 연결 실패${w?` · ${Math.round(w/1000)}초 뒤 재시도`:" · 재시도 예정"}</span>`;
+      if(state.view==="MENU")render();                // 배너 문구 갱신
+    }
+  }
+}
+
+/* === [V41] SETUP — 연결 설정 화면 (값은 이 브라우저 localStorage에만) === */
+const URL_RE=/^https:\/\/script\.google\.com\/.+\/exec$/;
+function openSetup(first){
+  MODAL=true; jModalReset();                          // === [V43]
+  const hasAny=!!(secretGet(SECRET_KEYS.url)||secretGet(SECRET_KEYS.key));
+  el("modal").innerHTML=
+   `<div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="amber b" style="font-size:14px">⚙ 연결 설정${first?" — 첫 실행":""}</span>
+      <span class="k" onclick="setupDemo()">✕ ${first?"데모로 보기":"닫기"}</span></div>
+    <div class="muted mono-sm" style="margin-top:6px;line-height:1.6">입력한 값은 <b>이 기기의 이 브라우저</b>에만 저장됩니다. 파일·저장소·다른 기기에는 남지 않습니다.<br>PC와 폰은 각각 한 번씩 입력하세요.</div>
+    <div class="sep"></div>
+    <label class="b" for="stUrl">Apps Script 웹앱 URL</label>
+    <input id="stUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="https://script.google.com/macros/s/…/exec" value="${esc(CONFIG.LIVE_URL||"")}"
+      style="box-sizing:border-box;width:100%;margin-top:4px;padding:8px;background:#161b22;color:var(--white);border:1px solid var(--line);font:inherit">
+    <label class="b" for="stKey" style="display:block;margin-top:10px">일지 저장 키 <span class="muted mono-sm">(THESIS 저장에만 필요 · Code.gs의 WRITE_KEY와 같은 값)</span></label>
+    <input id="stKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="비워 두면 읽기 전용" value="${esc(CONFIG.WRITE_KEY||"")}"
+      style="box-sizing:border-box;width:100%;margin-top:4px;padding:8px;background:#161b22;color:var(--white);border:1px solid var(--line);font:inherit">
+    <div id="stMsg" class="mono-sm" style="margin-top:8px;min-height:1.4em"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <span class="k" onclick="setupSave()">▶ 저장하고 연결</span>
+      ${hasAny?`<span class="k" onclick="setupClear()">🗑 이 기기에서 지우기</span>`:""}
+    </div>`;
+  el("modalbg").style.display="flex";
+  // 폰에서는 자동 포커스 안 함(키보드가 바로 올라와 화면을 가림). PC(마우스)에서만.
+  try{if(matchMedia("(pointer:fine)").matches)setTimeout(()=>{try{el(CONFIG.LIVE_URL?"stKey":"stUrl").focus({preventScroll:true});}catch(e){}},50);}catch(e){}
+}
+function setupMsg(t,cls){const m=el("stMsg");if(m)m.innerHTML=`<span class="${cls||"muted"}">${esc(t)}</span>`;}
+async function setupSave(){
+  const u=el("stUrl").value.trim(), k=el("stKey").value.trim();
+  if(!u){setupMsg("URL을 입력하세요 (읽기 전용으로 쓰려면 키는 비워도 됩니다)","dn");return;}
+  if(!URL_RE.test(u)){setupMsg("형식이 다릅니다 — https://script.google.com/…/exec 로 끝나는 배포 URL이어야 합니다","dn");return;}
+  const ok=secretSet(SECRET_KEYS.url,u)&secretSet(SECRET_KEYS.key,k);
+  if(u!==CONFIG.LIVE_URL){LIVE_ON=false;LAST_SYNC=null;LIVE_STALE=false;}   // === [V42] 주소가 바뀌면 새로 판정
+  CONFIG.LIVE_URL=u; CONFIG.WRITE_KEY=k;
+  setupMsg("연결 확인 중…","warn");
+  const _prevSync=LAST_SYNC;
+  await tryLive();
+  if(LIVE_ON&&LAST_SYNC&&LAST_SYNC!==_prevSync){
+    modalClose();
+    flashHint(ok?"연결됨 — 이 기기에 저장했습니다":"연결됨 — 단, 이 브라우저가 저장을 막아 다음 실행 때 다시 물을 수 있습니다");
+  }else{
+    MODAL=true; el("modalbg").style.display="flex";
+    setupMsg("연결 실패: "+(LAST_LIVE_ERR||"알 수 없는 오류")+" — URL을 확인하세요 (값은 저장해 두었습니다)","dn");
+  }
+}
+function setupClear(){
+  secretSet(SECRET_KEYS.url,""); secretSet(SECRET_KEYS.key,"");
+  CONFIG.LIVE_URL=""; CONFIG.WRITE_KEY="";
+  try{sessionStorage.removeItem("tkstock.demo");}catch(e){}
+  location.reload();
+}
+function setupDemo(){
+  try{sessionStorage.setItem("tkstock.demo","1");}catch(e){}
+  modalClose();
+}
+
+/* INIT */
+applyStartView();paintTop();paintTape();paintFkeys();tick();
+setInterval(()=>{tick();paintConn();},1000);          // === [V35] 경과시간 표기 갱신
+if(CONFIG.LIVE_URL)el("conn").innerHTML="<span class='muted'>◌ 연결 중…</span>";   // === [V42]
+render();tryLive();
+/* === [V41] 첫 실행: 저장된 URL이 없으면 SETUP (데모로 보기를 누른 세션은 다시 묻지 않음) === */
+(function(){let demo="";try{demo=sessionStorage.getItem("tkstock.demo")||"";}catch(e){}
+  if(!CONFIG.LIVE_URL&&!demo)openSetup(true);})();
+if(CONFIG.REFRESH_MIN>0) setInterval(autoSync,CONFIG.REFRESH_MIN*60000);   // === [V35] 자동 갱신
+el("cmd").focus();
+
+/* === [V38] 서비스 워커 등록 ===
+   https가 아니면 navigator.serviceWorker 자체가 없거나 등록이 거부된다.
+   그 경우 조용히 넘어간다 — file:// 사용에 아무 영향이 없다. */
+if("serviceWorker" in navigator && location.protocol==="https:"){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./sw.js")
+      .catch(err=>console.warn("[SW] 등록 실패:",err));
+  });
+}
+</script>
+</body>
+</html>
