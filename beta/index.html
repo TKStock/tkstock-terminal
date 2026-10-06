@@ -345,11 +345,27 @@
   .rgbody{display:flex;gap:8px;align-items:flex-start;}
   .vf-REGIME>.rgv,.vf-RRG>.rgv{flex:1 0 auto;}   /* [V49] 창 높이 꽉 */
   .vfill .rgv>.rgbody{flex:1 0 auto;align-items:stretch;}
-  .vfill .rgv>.rgbody>.rgmain{display:flex;flex-direction:column;margin-bottom:0;}
-  .vfill .rgv>.rgbody>.rgmain>.rgboard{flex:1 0 auto;grid-template-rows:auto 1fr;}
+  .vfill .rgv>.rgbody>.rgleft>.rgmain{display:flex;flex-direction:column;}
+  .vfill .rgv>.rgbody>.rgleft>.rgmain>.rgboard{flex:1 0 auto;grid-template-rows:auto 1fr;}
   .vfill .rgv>.rgbody>.rgsidecol>.panel{margin-bottom:0;}
   .vfill .rgv>.rgbody>.rgsidecol>.panel:last-child{flex:1 0 auto;}
   .rgmain{flex:2 1 0;min-width:0;}   /* [V48] 사분면 : 오른쪽 = 2 : 1 */
+  /* [V50] 왼쪽 = 사분면 판 + 이번 주 이동 (세로) */
+  .rgleft{flex:2 1 0;min-width:0;display:flex;flex-direction:column;gap:8px;}
+  .rgleft>.panel{margin-bottom:0;}
+  .rgleft>.rgmain{flex:1 0 auto;}
+  .rgmvgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-items:start;}
+  .rgmvgrid>.muted{grid-column:1/-1;}
+  .rgbars.big{padding:10px 10px 4px;min-height:212px;}
+  .rgbars.big .rgbar .s{width:min(34px,72%);}
+  .rgbars.big .rgbar .s i{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;font-style:normal;overflow:hidden;}
+  .rgbars.big .rgbar .n{font-size:13px;}
+  .rgbars.big .rgbar .w{font-size:10px;}
+  .rglg{display:flex;gap:4px 12px;flex-wrap:wrap;padding:2px 10px 8px;font-size:10px;color:#b9b9a6;}
+  .rglg i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;}
+  .rgleft .rgchips{gap:5px;}
+  .rgleft .rgchip{min-height:40px;}
+  .rgmvgrid .rgmv .l2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rgsidecol{flex:1 1 0;width:auto;display:flex;flex-direction:column;gap:8px;min-width:0;}
   .rgctl{display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
   .rgb{font:inherit;font-size:11px;background:transparent;color:var(--amber);border:1px solid var(--amber-dim);padding:1px 8px;cursor:pointer;white-space:nowrap;}
@@ -469,8 +485,37 @@
   .vf-REV>.rvv,.vf-VAL>.rvv{flex:1 0 auto;}   /* [V49] 창 높이 꽉 */
   .vfill .rvv:not(.ph)>.rvbody{flex:1 0 auto;}
   .rvside>.rvdet{flex:1 0 auto;}
-  .rvchw{display:flex;flex-direction:column;gap:2px;flex:1 0 auto;}
-  .rvch.g{flex:1 0 auto;}
+  .rvchw{display:flex;flex-direction:column;gap:2px;flex:0 0 auto;}
+  .rvch.g{flex:0 0 auto;}
+  /* [V50] 상세 숫자 칸 */
+  .rvtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
+  .rvt{border:1px solid var(--line);background:var(--panel2);padding:5px 8px 6px;display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .rvt .l{color:#9a9a86;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rvt b{font-size:18px;line-height:1.2;white-space:nowrap;}
+  .rvt .s{color:#c9c9b8;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .rvh3{color:var(--amber);font-weight:700;font-size:12px;margin-top:2px;}
+  .rvh3 span{color:var(--muted);font-weight:400;font-size:10px;margin-left:6px;}
+  .rvtab{width:100%;border-collapse:collapse;font-size:13px;}
+  .rvtab th{color:#9a9a86;font-weight:400;font-size:11px;text-align:right;padding:3px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .rvtab th:first-child,.rvtab td:first-child{text-align:left;}
+  .rvtab td{text-align:right;padding:5px 8px;border-bottom:1px solid #1a1a13;white-space:nowrap;}
+  .rvtab td small{color:#8b8b76;font-size:10px;margin-left:4px;}
+  .rvtab .on{background:#211b07;}
+  .rvtab th.on{color:var(--amber);}
+  .rvv.ph .rvtiles{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .rvv.ph .rvt b{font-size:16px;}
+  /* [V50] 5 REV·VAL 데스크톱: 화면은 창 높이에 고정, 표·상세는 각자 칸 안에서 스크롤 (머리줄 고정) */
+  .vf-REV>.rvv:not(.ph){flex:1 1 0;min-height:0;}
+  .vf-REV .rvv:not(.ph)>.rvbody{flex:1 1 0;min-height:420px;}
+  .vf-REV .rvv:not(.ph) .rvmain,.vf-REV .rvv:not(.ph) .rvside{overflow-y:auto;}
+  .vf-REV .rvv:not(.ph) .rvmain>.rvph,.vf-REV .rvv:not(.ph) .rvside>.rvph{position:sticky;top:0;z-index:3;}
+  .vf-REV .rvv:not(.ph) .rvcols{position:sticky;top:var(--rvphH,20px);z-index:2;background:var(--panel);}
+  .vf-REV .rvv:not(.ph) .rvside>.rvdet{gap:5px;}
+  .rvside>.rvph{flex:0 0 auto;}
+  .rvv.ph .rvmain,.psv.ph .rvmain{flex:none;}
+  .rvt b{overflow:hidden;text-overflow:ellipsis;}
+  @media(max-width:1500px){.rvv:not(.ph) .rvtiles{grid-template-columns:repeat(3,minmax(0,1fr));}}
+  .vf-REV .rvv:not(.ph) .rvtab td{padding:4px 8px;}
   .rvch.g svg{position:absolute;left:0;top:0;width:100%;height:100%;}
   .rvmain{flex:1 1 0;min-width:0;border:1px solid var(--line);background:var(--panel);overflow-x:auto;}
   .rvph,.psph{background:var(--amber);color:#000;font-weight:700;padding:2px 8px;display:flex;justify-content:space-between;gap:10px;white-space:nowrap;overflow:hidden;}
@@ -483,7 +528,7 @@
   .rvgh{display:flex;align-items:baseline;gap:8px;padding:6px 10px 2px;white-space:nowrap;}
   .rvgh b{font-size:13px;}
   .rvgh span{color:#8b8b76;font-size:11px;}
-  .rvrow{width:100%;padding:2px 10px 2px 8px;border:0;border-left:2px solid transparent;border-bottom:1px solid #16160f;background:transparent;color:var(--white);font:inherit;font-size:12px;text-align:left;cursor:pointer;white-space:nowrap;}
+  .rvrow{width:100%;padding:4px 10px 4px 8px;min-height:40px;border:0;border-left:2px solid transparent;border-bottom:1px solid #16160f;background:transparent;color:var(--white);font:inherit;font-size:12px;text-align:left;cursor:pointer;white-space:nowrap;}
   .rvrow:hover{background:#15150e;}
   .rvrow.on{background:#2a2208;border-left-color:var(--amber);}
   .rvrow svg{display:block;overflow:visible;}
@@ -491,7 +536,9 @@
   .rvtk b{color:var(--amber);}
   .rvst{font-size:10px;border:1px solid;padding:0 3px;line-height:1.25;}
   .rvpc{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;}
-  .rvpc span{color:#8b8b76;font-size:10px;}
+  .rvpc span{color:#8b8b76;font-size:11px;}
+  .rvrow{font-size:13px;}
+  .rvgh{padding-top:9px;}
   .rvmemo{color:#8b8b76;font-size:11px;overflow:hidden;text-overflow:ellipsis;}
   .rvloss{display:flex;align-items:center;gap:6px 8px;padding:8px 10px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:4px;}
   .rvchip{border:1px solid var(--line);background:var(--panel2);color:var(--white);font:inherit;font-size:11px;padding:2px 7px;cursor:pointer;white-space:nowrap;}
@@ -2577,17 +2624,17 @@ function rgBoxHtml(m,q){
     ${top?"":ghosts}<div class="rgchips">${mem.map(s=>rgChipHtml(m,s,q)).join("")||`<div class="muted rgempty">없음</div>`}</div>${top?ghosts:""}
   </div>`;
 }
-function rgBarsHtml(m){
+function rgBarsHtml(m,big){   // [V50] big = 데스크톱 확대판
   let h="";
   for(let j=Math.max(0,m.K-12); j<=m.K; j++){
     const c={"주도":0,"약화":0,"개선":0,"소외":0}; let n=0;
     m.list.forEach(s=>{const q=m.Q(s,j); if(q){c[q]++; n++;}});
     if(!n)continue;
-    const u=Math.max(3,Math.min(6,Math.floor(66/n))), br=c["주도"]+c["약화"];
-    const segs=[["주도",c["주도"]],["약화",c["약화"]],["",0],["개선",c["개선"]],["소외",c["소외"]]].map(a=>a[0]?`<i style="height:${a[1]*u}px;background:${QUAD[a[0]]}"></i>`:`<i style="height:2px;background:#000"></i>`).join("");
+    const u=big?Math.max(8,Math.floor(176/n)):Math.max(3,Math.min(6,Math.floor(66/n))), br=c["주도"]+c["약화"];
+    const segs=[["주도",c["주도"]],["약화",c["약화"]],["",0],["개선",c["개선"]],["소외",c["소외"]]].map(a=>a[0]?`<i style="height:${a[1]*u}px;background:${QUAD[a[0]]}">${big&&a[1]&&a[1]*u>=12?a[1]:""}</i>`:`<i style="height:2px;background:#000"></i>`).join("");
     h+=`<button type="button" class="rgbar${j===m.k?" on":""}" data-rg="wk:${j}" title="${escA((m.G.lab[j]||"")+" 주의 판 · 주도 "+c["주도"]+" · 약화 "+c["약화"]+" · 개선 "+c["개선"]+" · 소외 "+c["소외"])}"><span class="n ${br>=6?"up":br>=4?"":"dn"}">${br}</span><span class="s">${segs}</span><span class="w">${esc(m.G.lab[j]||"")}</span></button>`;
   }
-  return `<div class="rgbars">${h}</div>`;
+  return `<div class="rgbars${big?" big":""}">${h}</div>`+(big?`<div class="rglg">${["주도","약화","개선","소외"].map(q=>`<span><i style="background:${QUAD[q]}"></i>${q}</span>`).join("")}<span class="muted">칸 안 숫자 = 섹터 수 · 위 숫자 = 브레드스</span></div>`:"");
 }
 function rgMvRow(m,s,kind){
   const k=m.k, G=m.G, Q=m.Q, from=kind==="확정"?Q(s,k-2):Q(s,k-1), to=Q(s,k), bits=[];
@@ -2610,7 +2657,7 @@ function rgMovesHtml(m){
   m.list.filter(s=>{const a=Q(s,k-1), b=Q(s,k); return a&&b&&a!==b;}).sort((x,y)=>rgRS(y,k,m.G)-rgRS(x,k,m.G)).forEach(s=>rows.push(rgMvRow(m,s,"전이")));
   return rows.join("")||`<div class="muted">칸이 바뀐 섹터 없음</div>`;
 }
-function rgSideDefault(m){
+function rgSideDefault(m,noMoves){   // [V50] noMoves = 데스크톱 (이동은 사분면 아래 칸에)
   const k=m.k, avgAt=g=>{const v=m.list.filter(s=>s.grp===g).map(s=>rgRS(s,k,m.G)).filter(x=>x!=null); return v.length?v.reduce((a,c)=>a+c,0)/v.length:null;};
   const cyc=avgAt("cyc"), def=avgAt("def"), defs=m.list.filter(s=>s.grp==="def"), defOut=defs.filter(s=>m.Q(s,k)==="소외").length;
   const bar=(l,v,c)=>{if(v==null)return "";const w=Math.min(110,Math.abs(v)*5.5);
@@ -2618,8 +2665,8 @@ function rgSideDefault(m){
   const note=(cyc!=null&&def!=null)?(m.isNow&&cyc<0&&cyc-def>2
       ?`차이 ${rgS(cyc-def)} — 경기 평균도 시장 아래(${rgS(cyc)})라, 경기가 강해서가 아니라 방어가 더 빨리 무너진 것. 방어 ${defs.length}개 중 소외 ${defOut}개`
       :`${m.isNow?"":esc(m.G.lab[k]||"")+" 주 · "}차이 ${rgS(cyc-def)} · 방어 ${defs.length}개 중 소외 ${defOut}개`):"";
-  return `<div class="rgmvs">${rgMovesHtml(m)}</div>
-    <div class="rgh">경기 vs 방어 <span class="muted" style="font-weight:400;font-size:10px">그룹 평균 RS · 차이 = 경기−방어</span></div>
+  return `${noMoves?"":`<div class="rgmvs">${rgMovesHtml(m)}</div>`}
+    <div class="rgh"${noMoves?' style="display:none"':""}>경기 vs 방어 <span class="muted" style="font-weight:400;font-size:10px">그룹 평균 RS · 차이 = 경기−방어</span></div>
     ${bar(`경기 ${m.list.filter(s=>s.grp!=="def").length}`,cyc,"var(--cyan)")}${bar(`방어 ${defs.length}`,def,"var(--violet)")}
     <div class="rgnote">${note}</div>
     <div class="rgh">읽는 법</div>
@@ -2651,16 +2698,18 @@ function rgDesk(m){
   return `<div class="rgv">
     ${rgSumHtml(m)}
     <div class="rgbody">
-      <div class="panel rgmain">${ph(`QUADRANT BOARD · ${esc(m.G.lab[m.k]||"")}${m.isNow?"":" 주 (과거)"}`,hint)}
+      <div class="rgleft"><div class="panel rgmain">${ph(`QUADRANT BOARD · ${esc(m.G.lab[m.k]||"")}${m.isNow?"":" 주 (과거)"}`,hint)}
         <div class="rgctl"><span class="muted">화살표</span><span class="rgseg">${am}</span>${rgFocused()?`<button type="button" class="rgb" data-rg="reset">✕ 지금·전체</button>`:""}<span style="flex:1"></span><span class="muted mono-sm">칩 → 섹터 상세 · 막대 → 그 주의 판 · ESC 지금·전체</span></div>
         <div class="rgcolh"><span>← 시장보다 약함 (RS ≤ 0) · <b style="color:var(--white)">${N-nr}개</b></span><span>시장보다 강함 (RS &gt; 0) · <b class="${nr>=6?"up":nr>=4?"":"dn"}">${nr}개 = 브레드스 ${nr}/${N}</b> →</span></div>
         <div id="rgBoard" class="rgboard">${RG_ORDER.map(q=>rgBoxHtml(m,q)).join("")}<svg class="rgarr" aria-hidden="true"></svg></div>
         ${m.noQ.length?`<div class="rgnoq muted">칸 계산 불가 (5주 미만): ${m.noQ.map(s=>esc(s.tk)).join(" · ")}</div>`:""}
       </div>
+      <div class="panel rgmvp">${ph(m.isNow?"이번 주 이동":`${esc(m.G.lab[m.k]||"")} 주 이동`,m.k>0?`전주 ${esc(m.G.lab[m.k-1]||"")} 대비 · 확정 = 2주 연속 · 전이 = 이번 주 처음`:"")}
+        <div class="pb rgmvgrid">${rgMovesHtml(m)}</div></div></div>
       <div class="rgsidecol">
-        <div class="panel">${ph("칸 분포 13주","숫자 = 시장 이긴 섹터 · 막대 → 그 주")}${rgBarsHtml(m)}</div>
-        <div class="panel rgside">${sel?ph(`섹터 · ${esc(sel.tk)}`,esc(SEC_KO[sel.tk]||sel.name||"")):ph(m.isNow?"이번 주 이동":`${esc(m.G.lab[m.k]||"")} 주 이동`,m.k>0?`전주 ${esc(m.G.lab[m.k-1]||"")} 대비`:"")}
-          <div class="pb">${sel?rgDetailHtml(m,sel):rgSideDefault(m)}</div></div>
+        <div class="panel rgbarsp">${ph("칸 분포 13주","숫자 = 시장 이긴 섹터(주도+약화) · 막대를 누르면 그 주 판")}${rgBarsHtml(m,true)}</div>
+        <div class="panel rgside">${sel?ph(`섹터 · ${esc(sel.tk)}`,esc(SEC_KO[sel.tk]||sel.name||"")):ph("경기 vs 방어","그룹 평균 RS · 차이 = 경기−방어")}
+          <div class="pb">${sel?rgDetailHtml(m,sel):rgSideDefault(m,true)}</div></div>
       </div>
     </div>
   </div>`;
@@ -2881,7 +2930,7 @@ function rvRowHtml(r,M,sel,phone){
   }
   return `<button type="button" class="rvrow${on}" data-rv="sel:${escA(r.tk)}" title="${escA(r.tk+" 상세")}">`+
     `<span class="rvtk"><b>${esc(r.tk)}</b>${held}${rvStg(o)}</span>`+
-    rvRaceSvg(rvRace(r,k,236,28,false),"")+
+    rvRaceSvg(rvRace(r,k,236,32,false),"")+
     `<span class="r" style="color:${rvC(w.p)}">${rvP(w.p)}</span><span class="r" style="color:${rvC(w.labelE)}">${rvP(w.labelE)}</span>`+
     `<span class="rvpc"><b style="color:${rvPC(w.perChg)}">${rvP(w.perChg)}</b><span>${fmt(w.per0,1)} → ${fmt(w.per1,1)}</span></span>`+
     `<span class="r" style="color:${rvZC(z)}">${z==null?"—":rvS(z,2)}</span><span class="r" style="color:#b9b9a6">${o.peg27!=null&&isFinite(o.peg27)?fmt(o.peg27,2):"—"}</span>`+
@@ -2939,9 +2988,17 @@ function rvBand(o,Wd,Hd){
     `<line x1="0" x2="${Wd}" y1="${Y(m).toFixed(1)}" y2="${Y(m).toFixed(1)}" stroke="#8b8b76" stroke-dasharray="3 3"${ns}/><polyline points="${pts}" fill="none" stroke="#ffb000" stroke-width="1.5"${ns}/></svg>`+
     `<span style="position:absolute;left:${(X(n-1)/Wd*100).toFixed(2)}%;top:${Y(v[n-1]).toFixed(1)}px;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#ffb000"></span></div></div>`;
 }
+/* [V50] 기간별 변화: 마지막 점과 k주 전 점 (기록이 짧으면 있는 만큼) */
+function rvChg(r,k){
+  const rows=r.rows,n=rows.length; if(n<2)return null;
+  const s=Math.max(0,n-1-k), a=rows[s], b=rows[n-1];
+  const pc=(x,y)=>(x>0&&y>0)?(y/x-1)*100:null, per=x=>(x.px>0&&x.e>0)?x.px/x.e:null;
+  return {wk:n-1-s,from:a.d,p0:a.px,p1:b.px,p:pc(a.px,b.px),e0:a.e,e1:b.e,e:pc(a.e,b.e),eAbs:(a.e!=null&&b.e!=null)?b.e-a.e:null,
+    r0:per(a),r1:per(b),r:pc(per(a),per(b)),t0:a.tg,t1:b.tg,t:pc(a.tg,b.tg)};
+}
 function rvDetailHtml(M,tk){
   const r=M.by[tk]; if(!r)return `<div class="rvdet"><span class="muted">종목을 고르세요</span></div>`;
-  const o=r.o,w=r.w,k=M.k,g=r.g,bw=rvBig(r,k), pw=psWeights();
+  const o=r.o,w=r.w,k=M.k,g=r.g,bw=rvBig(r,k), pw=psWeights(), narrow=window.innerWidth<=700;
   const held=o.held?`<span class="cyan b" style="font-size:11px">● 보유 ${pw[tk]!=null?fmt(pw[tk],2)+"%":""}</span>`:"";
   const sec=SEC_KO_STK[o.sec]||o.sec||"";
   let line,sub;
@@ -2949,25 +3006,63 @@ function rvDetailHtml(M,tk){
   else if(w&&w.perChg!=null){line=RV_GT[g]||(o.pz==null?"PER 기록이 8주 미만 — z와 묶음은 기록이 쌓이면":"기록이 짧음"); sub=`PER ${fmt(w.per0,1)} → ${fmt(w.per1,1)} (${rvP(w.perChg)}) = 주가 ${rvP(w.p)} ÷ EPS ${rvP(w.labelE)}`;}
   else {line=r.n?"기록이 짧음":"이력 없음"; sub="";}
   const gc=RV_GC[g]||"#8b8b76";
-  const RH=window.innerWidth<=700?128:200, BH=window.innerWidth<=700?54:84;   // === [V48] 반폭 상세 — 차트를 키움
+  // 경주선 — 고정 높이 (V49의 절반쯤)
+  const RH=narrow?128:156, BH=narrow?54:48;
   const R=rvRace(r,k,372,RH,true);
   const chart=R?`<div class="rvchw"><div class="rvlg"><span><span style="color:#e9e9e4">━</span> 주가</span><span><span class="up">━</span> 27E EPS</span><span><span class="up">▒</span> EPS가 앞섬 = PER↓</span><span><span class="warn">▒</span> 주가가 앞섬 = PER↑</span></div>`+
-    `<div class="rvch g" style="min-height:${RH}px">${rvRaceSvg(R,"big")}`+   // [V49] 남는 높이만큼 늘어남 — 라벨은 % 위치
+    `<div class="rvch g" style="height:${RH}px">${rvRaceSvg(R,"big")}`+
     `<span class="lb" style="left:${(R.px/R.W*100).toFixed(2)}%;top:${(R.py/R.H*100).toFixed(2)}%;color:#e9e9e4">주가 ${rvP(w.p)}</span>`+
     `<span class="lb" style="left:${(R.px/R.W*100).toFixed(2)}%;top:${(R.ey/R.H*100).toFixed(2)}%;color:#33d17a">EPS ${rvP(w.labelE)}</span></div>`+
     `<div class="rvax"><span>${esc(R.dl)}</span><span>│ ${esc(R.ds)} = 100 (기간 시작)</span><span>${esc(R.dr)}</span></div></div>`:"";
-  const nums=r.loss
-    ?[["27E EPS",rvUsd(o.e27),"#e9e9e4"],[`${k}주 변화`,w&&w.eAbs!=null?rvS(w.eAbs,2):"—",rvC(w&&w.eAbs)],[`주가 ${k}주`,rvP(w&&w.p),rvC(w&&w.p)],["목표가 괴리",rvP(o.gap),rvC(o.gap)]]
-    :[[`주가 ${k}주`,rvP(w&&w.p),rvC(w&&w.p)],[`EPS27 ${k}주`,rvP(w&&w.labelE),rvC(w&&w.labelE)],["PER 변화",rvP(w&&w.perChg),rvPC(w&&w.perChg)],["z (자기 26주)",o.pz==null?"—":rvS(o.pz,2),rvZC(o.pz)],
-      ["PEG27",o.peg27!=null&&isFinite(o.peg27)?fmt(o.peg27,2):"—","#e9e9e4"],["목표가 괴리",rvP(o.gap),rvC(o.gap)],[`목표가 ${k}주`,rvP(w&&w.tg),rvC(w&&w.tg)],["PER27 지금",o.p27>0?fmt(o.p27,2):"—","#e9e9e4"]];
+  // 숫자 칸 — 변화율 + 시작→지금 값
+  const c=rvChg(r,k), T=(l,v,col,s)=>`<div class="rvt"><span class="l">${esc(l)}</span><b style="color:${col}">${esc(v)}</b><span class="s">${esc(s||"")}</span></div>`;
+  const lv=(a,b,f)=>(a==null||b==null)?"":`${f(a)} → ${f(b)}`;
+  const x1=v=>fmt(v,1)+"배", dpt=(a,b,d)=>(a==null||b==null||!isFinite(a)||!isFinite(b))?"":` (${rvS(b-a,d)})`;
+  let tiles;
+  if(r.loss){
+    tiles=[T("27E EPS 지금",rvUsd(o.e27),"#e9e9e4",`26E ${rvUsd(o.e26)} · 28E ${rvUsd(o.e28)}`),
+      T(`27E EPS ${k}주 변화`,c&&c.eAbs!=null?rvS(c.eAbs,2):"—",rvC(c&&c.eAbs),c?lv(c.e0,c.e1,rvUsd):""),
+      T(`주가 ${k}주`,rvP(c&&c.p),rvC(c&&c.p),c?lv(c.p0,c.p1,rvUsd):""),
+      T("목표가 괴리",rvP(o.gap),rvC(o.gap),`목표 ${rvUsd(o.tgt)} · 현재 ${rvUsd(o.px)}`),
+      T(`목표가 ${k}주`,rvP(c&&c.t),rvC(c&&c.t),c?lv(c.t0,c.t1,rvUsd):""),
+      T("28E EPS",rvUsd(o.e28),rvC(o.e28!=null&&o.e27!=null?o.e28-o.e27:null),(o.e28!=null&&o.e27!=null&&isFinite(o.e28-o.e27))?`27E 대비 ${rvS(o.e28-o.e27,2)} · ${o.e28>0?"흑자 전환":o.e28>o.e27?"적자 축소":"적자 확대"}`:""),
+      T("기록",`${r.n}주`,"#e9e9e4",r.rows.length?`${r.rows[0].d.slice(5)} ~ ${r.rows[r.rows.length-1].d.slice(5)}`:""),
+      T("스테이지",o.stage||"—","#e9e9e4",`RS ${fmt(o.rs)} · 고점대비 ${pct(o.ddFromHi)}`)];
+  }else{
+    const ps=(o.perSer||[]).filter(v=>v!=null&&isFinite(v)), pm=ps.length?avg(ps):null, sd=ps.length>1?std(ps):null;
+    tiles=[T(`주가 ${k}주`,rvP(c&&c.p),rvC(c&&c.p),c?lv(c.p0,c.p1,rvUsd)+dpt(c.p0,c.p1,2):""),
+      T(`27E EPS ${k}주`,rvP(c&&c.e),rvC(c&&c.e),c?lv(c.e0,c.e1,rvUsd)+dpt(c.e0,c.e1,2):""),
+      T(`PER27 ${k}주`,rvP(c&&c.r),rvPC(c&&c.r),c?lv(c.r0,c.r1,x1)+dpt(c.r0,c.r1,1):""),
+      T("z (자기 26주)",o.pz==null?"—":rvS(o.pz,2),rvZC(o.pz),o.pz==null?"PER 기록 8주 미만":`백분위 ${Math.round(o.ppct)}% · ${o.perN}주 중`),
+      T(`목표가 ${k}주`,rvP(c&&c.t),rvC(c&&c.t),c?lv(c.t0,c.t1,rvUsd)+dpt(c.t0,c.t1,2):""),
+      T("목표가 괴리",rvP(o.gap),rvC(o.gap),`목표 ${rvUsd(o.tgt)} · 현재 ${rvUsd(o.px)}`),
+      T("PEG27",o.peg27!=null&&isFinite(o.peg27)?fmt(o.peg27,2):"—","#e9e9e4",`27E 성장률 ${o.g27!=null&&isFinite(o.g27)?rvP(o.g27):"—"} · 28E ${o.g28!=null&&isFinite(o.g28)?rvP(o.g28):"—"}`),
+      T("PER27 지금",o.p27>0?fmt(o.p27,2)+"배":"—","#e9e9e4",`26E ${o.p26>0?fmt(o.p26,1):"—"} · 28E ${o.p28>0?fmt(o.p28,1):"—"}`),
+      T("PER27 26주 평균",pm!=null?fmt(pm,1)+"배":"—","#e9e9e4",sd!=null?`±1σ ${fmt(pm-sd,1)} ~ ${fmt(pm+sd,1)}`:""),
+      T("PER27 26주 범위",ps.length?`${fmt(Math.min(...ps),1)} ~ ${fmt(Math.max(...ps),1)}`:"—","#e9e9e4",ps.length&&o.p27>0?`지금은 최저에서 ${rvP((o.p27/Math.min(...ps)-1)*100)}`:""),
+      T("가장 크게 움직인 주",bw.eT.replace(/^EPS /,"EPS "),"#e9e9e4",bw.pT||""),
+      T("27E EPS 지금",rvUsd(o.e27),"#e9e9e4",`26E ${rvUsd(o.e26)} · 28E ${rvUsd(o.e28)}`)];
+  }
+  // 기간별 변화 표 (4주 · 13주 · 기록 전체) — 지금 고른 기간 열 강조
+  const C4=rvChg(r,4), C13=rvChg(r,13), CA=rvChg(r,999), cols=[[4,C4],[13,C13],[CA?CA.wk:26,CA]];
+  const cell=(C,f,colf)=>{const v=C?f(C):null;return `<td style="color:${colf(v)}">${r.loss&&f===fE?(C&&C.eAbs!=null?rvS(C.eAbs,2):"—"):rvP(v)}</td>`;};
+  const fP=C=>C.p, fE=C=>C.e, fR=C=>C.r, fT=C=>C.t;
+  const th=cols.map(([wk,C],i)=>`<th class="${(i===0&&k===4)||(i===1&&k===13)?"on":""}">${i===2?`전체 ${wk}주`:wk+"주"}</th>`).join("");
+  const rowT=(lab,f,colf,now)=>`<tr><td>${lab}</td>${cols.map(([wk,C],i)=>cell(C,f,colf).replace("<td",`<td class="${(i===0&&k===4)||(i===1&&k===13)?"on":""}"`)).join("")}<td style="color:#e9e9e4">${now}</td></tr>`;
+  const table=`<table class="rvtab"><tr><th>기간별 변화</th>${th}<th>지금 값</th></tr>`+
+    rowT("주가",fP,rvC,rvUsd(o.px))+
+    rowT(r.loss?"27E EPS ($ 변화)":"27E EPS",fE,v=>r.loss?"#e9e9e4":rvC(v),rvUsd(o.e27))+
+    (r.loss?"":rowT("PER27",fR,rvPC,o.p27>0?fmt(o.p27,2)+"배":"—"))+
+    rowT("목표가",fT,rvC,rvUsd(o.tgt))+`</table>`;
   const srcT=r.src==="실측"?"Database 주간 현재가·27E EPS·PER27·목표가 + 오늘 대시보드 (FY 표기 그대로)"
     :r.src==="역산"?"주가 = PER27 × 같은 주 27E EPS로 역산 (구버전 Code.gs — V47 조각을 붙이면 실제 현재가·목표가로)"
     :r.src==="시드"?"SIM 데모 — 시드 주간 데이터":r.src==="EPS"?"Database 주간 27E EPS":"이력 없음";
   return `<div class="rvdet"><div class="rvd1"><span class="tk">${esc(tk)}</span><b>${esc(PS_NAME[tk]||"")}</b>${held}<span class="sp"></span><span class="muted" style="font-size:11px">${esc(sec)}</span>${o.stage?stageChip(o.stage):""}</div>`+
     `<div class="rvd2"><span class="rvgb" style="background:${gc}">${esc(g)}</span><span class="b" style="line-height:1.4">${esc(line)}</span></div>`+
     (sub?`<div class="b" style="font-size:12px;line-height:1.45">${esc(sub)}</div>`:"")+chart+(r.loss?"":rvBand(o,372,BH))+
-    `<div class="rvnums">${nums.map(x=>`<div><span>${esc(x[0])}</span><b style="color:${x[2]}">${esc(x[1])}</b></div>`).join("")}</div>`+
-    (r.loss?"":`<span style="font-size:11px;color:#d6d6c8"><span class="muted">가장 크게 움직인 주</span> ${esc(bw.eT)}${bw.pT?" · "+esc(bw.pT):""}</span>`)+
+    `<div class="rvh3">핵심 숫자<span>${k}주 = 지금 고른 기간 · 아래 작은 글씨 = 시작 → 지금 (차이)</span></div>`+
+    `<div class="rvtiles">${tiles.join("")}</div>`+
+    `<div class="rvh3">기간별 변화<span>마지막 주간 점 기준 · 기록이 짧으면 있는 만큼</span></div>${table}`+
     `<span class="rvnote sep2">출처 — ${esc(srcT)}</span></div>`;
 }
 function vRevVal(){
