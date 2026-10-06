@@ -356,13 +356,31 @@
   .rgleft>.rgmain{flex:1 0 auto;}
   .rgmvgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:18px;align-items:start;}
   .rgmvgrid>.muted{grid-column:1/-1;}
-  .rgbars.big{padding:10px 10px 4px;min-height:212px;}
+  .rgbars.big{padding:8px 10px 2px;min-height:178px;}
   .rgbars.big .rgbar .s{width:min(34px,72%);}
   .rgbars.big .rgbar .s i{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#000;font-style:normal;overflow:hidden;}
   .rgbars.big .rgbar .n{font-size:13px;}
   .rgbars.big .rgbar .w{font-size:10px;}
   .rglg{display:flex;gap:4px 12px;flex-wrap:wrap;padding:2px 10px 8px;font-size:10px;color:#b9b9a6;}
   .rglg i{display:inline-block;width:9px;height:9px;margin-right:4px;vertical-align:-1px;}
+  /* [V51] 내 돈은 어느 칸에 · 다음 주 판정선 */
+  .rgmyp>.pb,.rgnxp>.pb{display:flex;flex-direction:column;gap:3px;padding-top:6px;padding-bottom:6px;}
+  .rgmy{display:grid;grid-template-columns:52px minmax(60px,1fr) 52px minmax(0,1.6fr);align-items:center;gap:8px;font-size:12px;}
+  .rgmy .bar{height:9px;background:#1a1a14;position:relative;}
+  .rgmy .bar i{position:absolute;left:0;top:0;bottom:0;}
+  .rgmy .v{text-align:right;}
+  .rgmy .tks{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;}
+  .rgmy .tks small{color:#8b8b76;font-size:9px;margin-left:2px;margin-right:4px;}
+  .rgmyw{font-size:11px;line-height:1.4;margin-top:2px;}
+  .rgmyn{font-size:10px;margin-top:2px;}
+  .rgnxs{font-size:11px;margin-bottom:2px;}
+  .rgnxr{display:flex;align-items:baseline;gap:7px;width:100%;padding:2px 2px;border:0;border-bottom:1px solid #1a1a13;background:transparent;color:var(--white);font:inherit;font-size:12px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;}
+  .rgnxr:hover{background:#17170f;}
+  .rgnxr .sp{flex:1 1 auto;}
+  .rgnxr .muted{overflow:hidden;text-overflow:ellipsis;}
+  .rgfold>summary{cursor:pointer;list-style:none;}
+  .rgfold>summary::before{content:"▸ ";}
+  .rgfold[open]>summary::before{content:"▾ ";}
   .rgleft .rgchips{gap:5px;}
   .rgleft .rgchip{min-height:40px;}
   .rgmvgrid .rgmv .l2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -2630,7 +2648,7 @@ function rgBarsHtml(m,big){   // [V50] big = 데스크톱 확대판
     const c={"주도":0,"약화":0,"개선":0,"소외":0}; let n=0;
     m.list.forEach(s=>{const q=m.Q(s,j); if(q){c[q]++; n++;}});
     if(!n)continue;
-    const u=big?Math.max(8,Math.floor(176/n)):Math.max(3,Math.min(6,Math.floor(66/n))), br=c["주도"]+c["약화"];
+    const u=big?Math.max(8,Math.floor(146/n)):Math.max(3,Math.min(6,Math.floor(66/n))), br=c["주도"]+c["약화"];
     const segs=[["주도",c["주도"]],["약화",c["약화"]],["",0],["개선",c["개선"]],["소외",c["소외"]]].map(a=>a[0]?`<i style="height:${a[1]*u}px;background:${QUAD[a[0]]}">${big&&a[1]&&a[1]*u>=12?a[1]:""}</i>`:`<i style="height:2px;background:#000"></i>`).join("");
     h+=`<button type="button" class="rgbar${j===m.k?" on":""}" data-rg="wk:${j}" title="${escA((m.G.lab[j]||"")+" 주의 판 · 주도 "+c["주도"]+" · 약화 "+c["약화"]+" · 개선 "+c["개선"]+" · 소외 "+c["소외"])}"><span class="n ${br>=6?"up":br>=4?"":"dn"}">${br}</span><span class="s">${segs}</span><span class="w">${esc(m.G.lab[j]||"")}</span></button>`;
   }
@@ -2657,6 +2675,58 @@ function rgMovesHtml(m){
   m.list.filter(s=>{const a=Q(s,k-1), b=Q(s,k); return a&&b&&a!==b;}).sort((x,y)=>rgRS(y,k,m.G)-rgRS(x,k,m.G)).forEach(s=>rows.push(rgMvRow(m,s,"전이")));
   return rows.join("")||`<div class="muted">칸이 바뀐 섹터 없음</div>`;
 }
+/* === [V51] 내 돈은 어느 칸에 — 보유 평가액(총자산 기준 비중)을 섹터 칸별로 합산 ===
+   종목 → 섹터 ETF는 대시보드 '섹터' 칸(rgSecOf). ETF는 이 표로: 시장 전체 ETF = '시장', 반도체·메모리·사이버보안 ETF = XLK.
+   다음 주 판정선이 '제자리면 바뀜'인 보유 섹터와, 경계까지 RS 1 미만인 보유 섹터는 아래에 경고. */
+const RG_ETFSEC={SPYM:"MKT",SPY:"MKT",VOO:"MKT",IVV:"MKT",SPLG:"MKT",RSP:"MKT",QQQ:"XLK",QQQM:"XLK",DRAM:"XLK",BUG:"XLK",SOXX:"XLK",SMH:"XLK",CIBR:"XLK",HACK:"XLK",IGV:"XLK"};
+function rgNextMg(nx){   // 지금 칸을 지키는 구간의 경계까지 RS 거리
+  const keep=nx.seg.find(g=>g.q===nx.cur); if(!keep)return {mg:null,edge:null};
+  const dl=keep.lo==null?Infinity:nx.now-keep.lo, dh=keep.hi==null?Infinity:keep.hi-nx.now, mg=Math.min(dl,dh);
+  return {mg:isFinite(mg)?mg:null,edge:dl<=dh?keep.lo:keep.hi};
+}
+function rgMoneyHtml(m){
+  const T=psTotals(); if(!T.H.length)return `<div class="muted">보유 없음 (Holdings 미수신)</div>`;
+  const k=m.k, B={"주도":[],"약화":[],"개선":[],"소외":[],"시장":[],"칸 없음":[]};
+  T.H.forEach(o=>{
+    const e=RG_ETFSEC[o.tk]||rgSecOf(o), w=T.tot>0?o.mv/T.tot*100:0;
+    if(e==="MKT"){B["시장"].push({o,w,e:""});return;}
+    const sx=e?SX.find(x=>x.tk===e):null, q=sx?m.Q(sx,k):null;
+    B[q||"칸 없음"].push({o,w,e:e||"",sx});
+  });
+  const col={"주도":QUAD["주도"],"약화":QUAD["약화"],"개선":QUAD["개선"],"소외":QUAD["소외"],"시장":"#b9b9a6","칸 없음":"#7d7d68"};
+  const row=(lab,items,c,sub)=>{const w=items.reduce((a,x)=>a+x.w,0);
+    return `<div class="rgmy"><b style="color:${c}">${lab}</b><span class="bar"><i style="width:${Math.min(100,w).toFixed(1)}%;background:${c}"></i></span><b class="v">${fmt(w,1)}%</b>`+
+      `<span class="tks">${sub!=null?sub:items.sort((a,b)=>b.w-a.w).map(x=>`<span class="k" data-cmd="${escA(x.o.tk)}">${esc(x.o.tk)}</span>${x.e?`<small>${esc(x.e)}</small>`:""}`).join(" ")||`<span class="muted">—</span>`}</span></div>`;};
+  let h=["주도","약화","개선","소외"].map(q=>row(q,B[q],col[q])).join("");
+  if(B["시장"].length)h+=row("시장",B["시장"],col["시장"]);
+  if(B["칸 없음"].length)h+=row("칸 없음",B["칸 없음"],col["칸 없음"]);
+  if(T.c&&T.tot>0)h+=row("예수금",[{w:T.c.t/T.tot*100}],"#8b8b76",`<span class="muted">KIS</span>`);
+  // 경고: 보유 섹터의 다음 주 판정선
+  if(m.isNow){
+    const seen={}, warn=[];
+    ["주도","약화","개선","소외"].forEach(q=>B[q].forEach(x=>{if(!x.sx||seen[x.e])return; seen[x.e]=1;
+      const nx=rgNext(x.sx); if(!nx)return; const ws=B[q].filter(y=>y.e===x.e), w=ws.reduce((a,y)=>a+y.w,0), tks=ws.map(y=>y.o.tk).join("·");
+      if(nx.flips)warn.push(`<div class="rgmyw dn">⚠ ${esc(x.e)} ${nx.cur} → 제자리면 다음 주 <b style="color:${QUAD[nx.flat]}">${nx.flat}</b> · ${esc(tks)} ${fmt(w,1)}%</div>`);
+      else{const g=rgNextMg(nx); if(g.mg!=null&&g.mg<1)warn.push(`<div class="rgmyw warn">◆ ${esc(x.e)} ${nx.cur} 경계(${g.edge===0?"0":rgS(g.edge)})까지 RS ${fmt(g.mg)} · ${esc(tks)} ${fmt(w,1)}%</div>`);}
+    }));
+    h+=warn.join("")||`<div class="rgmyw muted">보유 섹터 중 다음 주 칸이 바뀔 곳 없음 (제자리 기준)</div>`;
+  }
+  return h+`<div class="rgmyn muted">종목 → 섹터 = 대시보드 '섹터' 칸 · ETF: SPYM = 시장, DRAM·BUG = XLK로 봄</div>`;
+}
+/* === [V51] 다음 주 판정선 — 섹터마다 '다음 주 RS가 지금과 같으면' 어느 칸인지, 지금 칸의 경계까지 거리 === */
+function rgNextListHtml(m){
+  if(!m.isNow)return `<div class="muted">지금 판에서만 계산합니다 — 과거 주를 보는 중 (<span class="k" data-rg="reset">지금으로</span>)</div>`;
+  const rows=m.list.map(s=>{const nx=rgNext(s); if(!nx)return null; const g=rgNextMg(nx); return {s,nx,mg:g.mg,edge:g.edge};}).filter(Boolean);
+  if(!rows.length)return `<div class="muted">RS 기록이 5주 미만이라 계산하지 않음</div>`;
+  rows.sort((a,b)=>(b.nx.flips-a.nx.flips)||((a.mg==null?1e9:a.mg)-(b.mg==null?1e9:b.mg)));
+  const nf=rows.filter(r=>r.nx.flips).length;
+  return `<div class="rgnxs">${nf?`<b class="dn">제자리면 바뀜 ${nf}</b>`:`<span class="muted">제자리면 바뀌는 섹터 없음</span>`} <span class="muted">· 전체 ${rows.length}개 중 가까운 5개</span></div>`+
+    rows.slice(0,5).map(r=>{const s=r.s,nx=r.nx,hold=m.H[s.tk];
+      const tail=nx.flips?`<span class="dn">제자리면 바뀜</span> <span class="muted">· ${esc(nx.keepTxt)}</span>`
+        :`<span class="muted">유지 · 경계(${r.edge===0?"0":rgS(r.edge)})까지</span> <b class="${r.mg!=null&&r.mg<1?"warn":""}">${r.mg==null?"—":fmt(r.mg)}</b>`;
+      return `<button type="button" class="rgnxr" data-rg="sel:${escA(s.tk)}" title="${escA(s.tk+" 섹터 상세 · "+nx.others)}"><b class="amber">${esc(s.tk)}</b>${hold?`<span class="cyan">●${hold.length}</span>`:""}`+
+        `<span style="color:${QUAD[nx.cur]}">${nx.cur}</span>${nx.flips?`<span class="muted">→</span><b style="color:${QUAD[nx.flat]}">${nx.flat}</b>`:""}<span class="sp"></span>${tail}</button>`;}).join("");
+}
 function rgSideDefault(m,noMoves){   // [V50] noMoves = 데스크톱 (이동은 사분면 아래 칸에)
   const k=m.k, avgAt=g=>{const v=m.list.filter(s=>s.grp===g).map(s=>rgRS(s,k,m.G)).filter(x=>x!=null); return v.length?v.reduce((a,c)=>a+c,0)/v.length:null;};
   const cyc=avgAt("cyc"), def=avgAt("def"), defs=m.list.filter(s=>s.grp==="def"), defOut=defs.filter(s=>m.Q(s,k)==="소외").length;
@@ -2669,9 +2739,9 @@ function rgSideDefault(m,noMoves){   // [V50] noMoves = 데스크톱 (이동은 
     <div class="rgh"${noMoves?' style="display:none"':""}>경기 vs 방어 <span class="muted" style="font-weight:400;font-size:10px">그룹 평균 RS · 차이 = 경기−방어</span></div>
     ${bar(`경기 ${m.list.filter(s=>s.grp!=="def").length}`,cyc,"var(--cyan)")}${bar(`방어 ${defs.length}`,def,"var(--violet)")}
     <div class="rgnote">${note}</div>
-    <div class="rgh">읽는 법</div>
+    ${noMoves?`<details class="rgfold"><summary class="rgh">읽는 법</summary>`:`<div class="rgh">읽는 법</div>`}
     <div class="rgread">${["주도","약화","소외","개선"].map(q=>`<span><b style="color:${QUAD[q]}">${q}</b> <span style="color:#b9b9a6">${QUAD_TXT[q]}</span></span>`).join("")}
-      <span class="muted">교과서적 순환은 개선 → 주도 → 약화 → 소외 (시계방향). 실선 화살표 = 2주 연속(확정), 점선 = 이번 주 처음(확인 전). 칸 안 순서는 RS 순, 새로 들어온 섹터는 넘어온 경계 쪽 끝에. U/D는 칸을 나누지 않는 보조 지표.</span></div>`;
+      <span class="muted">교과서적 순환은 개선 → 주도 → 약화 → 소외 (시계방향). 실선 화살표 = 2주 연속(확정), 점선 = 이번 주 처음(확인 전). 칸 안 순서는 RS 순, 새로 들어온 섹터는 넘어온 경계 쪽 끝에. U/D는 칸을 나누지 않는 보조 지표.</span></div>${noMoves?"</details>":""}`;
 }
 function rgDetailHtml(m,s){
   const nr=rgNext(s), hold=m.H[s.tk], d4=(s._r4&&s._r0)?s._r4-s._r0:0;
@@ -2708,6 +2778,8 @@ function rgDesk(m){
         <div class="pb rgmvgrid">${rgMovesHtml(m)}</div></div></div>
       <div class="rgsidecol">
         <div class="panel rgbarsp">${ph("칸 분포 13주","숫자 = 시장 이긴 섹터(주도+약화) · 막대를 누르면 그 주 판")}${rgBarsHtml(m,true)}</div>
+        <div class="panel rgmyp">${ph("내 돈은 어느 칸에",`총자산 기준 · ${m.isNow?"이번 주 칸":esc(m.G.lab[m.k]||"")+" 주 칸"}`)}<div class="pb">${rgMoneyHtml(m)}</div></div>
+        <div class="panel rgnxp">${ph("다음 주 판정선","제자리 = 다음 주 RS가 이번 주와 같을 때 · 가까운 순")}<div class="pb">${rgNextListHtml(m)}</div></div>
         <div class="panel rgside">${sel?ph(`섹터 · ${esc(sel.tk)}`,esc(SEC_KO[sel.tk]||sel.name||"")):ph("경기 vs 방어","그룹 평균 RS · 차이 = 경기−방어")}
           <div class="pb">${sel?rgDetailHtml(m,sel):rgSideDefault(m,true)}</div></div>
       </div>
@@ -2728,6 +2800,8 @@ function rgPhone(m){
     <div class="muted mono-sm">위 줄 = 4주 변화 ≥ 0 (좋아지는 중) · 보라 = 방어 · ←칸 = 전주에서 넘어온 칸 · 눌러서 상세</div>
     ${sel?`<div class="panel">${ph(`섹터 · ${esc(sel.tk)}`,esc(SEC_KO[sel.tk]||sel.name||""))}<div class="pb">${rgDetailHtml(m,sel)}</div></div>`:""}
     <div class="panel">${ph("칸 분포 13주","숫자 = 시장 이긴 섹터 · 막대 → 그 주")}${rgBarsHtml(m)}</div>
+    <div class="panel rgmyp">${ph("내 돈은 어느 칸에","총자산 기준")}<div class="pb">${rgMoneyHtml(m)}</div></div>
+    <div class="panel rgnxp">${ph("다음 주 판정선","제자리 기준 · 가까운 순")}<div class="pb">${rgNextListHtml(m)}</div></div>
     <div class="panel rgside">${ph(m.isNow?"이번 주 이동":`${esc(m.G.lab[m.k]||"")} 주 이동`,m.k>0?`전주 ${esc(m.G.lab[m.k-1]||"")} 대비`:"")}<div class="pb">${rgMovesHtml(m)}</div></div>
   </div>`;
 }

@@ -4,7 +4,7 @@
    · 같은 출처(github.io)만 다룬다. Apps Script(실데이터)·TradingView 요청은 건드리지 않는다
      → 시트 데이터가 폰에 캐시로 남지 않는다.
    파일을 바꿔 올릴 때 CACHE 이름의 숫자를 올리면 옛 캐시가 지워진다. */
-const CACHE = "tkstock-beta-v50";
+const CACHE = "tkstock-beta-v51";
 const SHELL = ["./", "./index.html", "./manifest.json",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-maskable-512.png"];
 
